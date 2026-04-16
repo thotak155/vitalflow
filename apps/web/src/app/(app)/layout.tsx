@@ -8,6 +8,13 @@ import { surfacesFor } from "../../lib/roles.js";
 
 import { AppShell } from "./_shell/app-shell.js";
 
+/**
+ * Every page under (app) reads cookies + session — prerendering would
+ * serve stale or empty auth state. Force dynamic rendering so Next skips
+ * the static export step and renders per-request.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
   if (!session) {
