@@ -1,0 +1,206 @@
+name: Deploy · Production
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref (tag) to deploy
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  deployments: write
+  id-token: write
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: confirm the tagged commit was green on staging.
+  # ---------------------------------------------------------------------------
+  guard:
+    name: Guard — require staging green for commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - name: Require staging success for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          state=$(gh api "repos/${{ github.repository }}/commits/$commit/check-runs" \
+            --jq '[.check_runs[] | select(.name | startswith("Smoke (staging)"))] |
+                  (if length == 0 then "missing"
+                   elif all(.conclusion == "success") then "success"
+                   else "failed" end)')
+          echo "staging-status=$state"
+          if [ "$state" != "success" ]; then
+            echo "::error::Commit $commit has not passed staging smoke"
+            exit 1
+          fi
+
+  gate:
+    name: Gate
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test && pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Apply migrations to the production Supabase project. Gated by the
+  # `production` GitHub Environment → requires manual approval from a member
+  # of the `ops-production` team.
+  # ---------------------------------------------------------------------------
+  migrate-db:
+    name: Migrate DB (production)
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.vitalflow.health
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_PROD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF_PROD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - name: Print pending migrations
+        run: supabase migration list --linked
+      - name: Apply migrations
+        run: supabase db push --linked
+      - name: Run security advisors; fail on ERROR-level lints
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fSL -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/advisors?type=security" \
+            -o /tmp/security.json
+          errors=$(jq '[.lints[] | select(.level == "ERROR")] | length' /tmp/security.json)
+          if [ "$errors" -gt 0 ]; then
+            jq '.lints[] | select(.level == "ERROR")' /tmp/security.json
+            echo "::error::Production DB has $errors security ERRORs post-migrate — aborting deploy"
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy web (production)
+    needs: migrate-db
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.vitalflow.health
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+      - run: npx vercel build --prod --token=$VERCEL_TOKEN
+      - run: npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+  smoke:
+    name: Smoke (production)
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vitalflow/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @vitalflow/web test:e2e -- --grep @smoke
+        env:
+          PLAYWRIGHT_BASE_URL: https://app.vitalflow.health
+
+  release:
+    name: GitHub Release
+    needs: smoke
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+  sentry:
+    name: Sentry release
+    needs: smoke
+    runs-on: ubuntu-latest
+    if: env.SENTRY_AUTH_TOKEN != ''
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: vitalflow
+    steps:
+      - uses: actions/checkout@v4
+      - uses: getsentry/action-release@v1
+        with:
+          environment: production
+          projects: vitalflow
+          version: ${{ github.sha }}
+
+  notify:
+    name: Notify
+    needs: [deploy, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack post
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DEPLOY }}
+          STATUS: ${{ (needs.deploy.result == 'success' && needs.smoke.result == 'success') && 'success' || 'failure' }}
+        run: |
+          curl -sS -X POST -H 'Content-type: application/json' --data "{
+            \"text\": \"VitalFlow PRODUCTION deploy · $STATUS · $(git rev-parse --short HEAD) · by ${{ github.actor }}\"
+          }" "$SLACK_WEBHOOK_URL"

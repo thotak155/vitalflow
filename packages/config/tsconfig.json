@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "include": ["tailwind/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

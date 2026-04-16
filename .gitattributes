@@ -1,0 +1,32 @@
+# Normalize line endings across Windows, macOS, and Linux contributors.
+* text=auto eol=lf
+
+# Explicitly LF for code, config, and docs.
+*.ts       text eol=lf
+*.tsx      text eol=lf
+*.js       text eol=lf
+*.mjs      text eol=lf
+*.cjs      text eol=lf
+*.json     text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.md       text eol=lf
+*.sql      text eol=lf
+*.css      text eol=lf
+*.html     text eol=lf
+*.sh       text eol=lf
+
+# Treat these as binary (no CRLF conversion, no diff spam).
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.ico      binary
+*.pdf      binary
+*.woff     binary
+*.woff2    binary
+
+# Generated file — keep out of diff noise on PRs.
+packages/types/src/db/supabase.generated.ts linguist-generated=true
+pnpm-lock.yaml                              linguist-generated=true

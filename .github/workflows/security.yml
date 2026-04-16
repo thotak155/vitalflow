@@ -1,0 +1,110 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 14 * * 1" # Mondays 14:00 UTC — weekly baseline scan
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Dependency audit — fails PR on HIGH+ vulnerabilities.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: pnpm audit (fail on high/critical)
+        run: pnpm audit --audit-level=high --prod
+
+  # ---------------------------------------------------------------------------
+  # gitleaks: detect accidentally-committed secrets.
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          config-path: .github/gitleaks.toml
+
+  # ---------------------------------------------------------------------------
+  # GitHub CodeQL — JS + TS semantic static analysis. Findings surface in the
+  # Security tab and block merge on `main`/`develop` via branch protection.
+  # ---------------------------------------------------------------------------
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript, typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql-config.yml
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ---------------------------------------------------------------------------
+  # Supabase advisors — runs on scheduled + main-branch pushes against the
+  # production project to catch security/perf regressions post-merge.
+  # ---------------------------------------------------------------------------
+  supabase-advisors:
+    name: Supabase advisors (prod)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    environment: production-readonly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+      - name: Run advisors and fail on ERRORs
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF_PROD }}
+        run: |
+          set -euo pipefail
+          curl -fSL -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/advisors?type=security" \
+            -o /tmp/security.json
+          errors=$(jq '[.lints[] | select(.level == "ERROR")] | length' /tmp/security.json)
+          if [ "$errors" -gt 0 ]; then
+            echo "::error::Supabase security advisor has $errors ERROR-level findings"
+            jq '.lints[] | select(.level == "ERROR")' /tmp/security.json
+            exit 1
+          fi

@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+.turbo
+out
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+coverage
+.nyc_output
+playwright-report
+test-results
+
+# Env files — never commit secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+.cache
+.parcel-cache
+.eslintcache
+.prettiercache

@@ -1,0 +1,25 @@
+# VitalFlow gitleaks config.
+# Inherits default rules plus allow-lists for docs/examples.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlisted paths and placeholder values"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.staging\.example$''',
+  '''\.env\.production\.example$''',
+  '''docs/.*\.md$''',
+  '''supabase/migrations/.*\.sql$''',
+  '''pnpm-lock\.yaml$''',
+]
+regexes = [
+  # Example/fake keys used in docs
+  '''sk_test_[A-Za-z0-9]{16,}''',
+  '''pk_test_[A-Za-z0-9]{16,}''',
+  '''whsec_test_[A-Za-z0-9]{16,}''',
+  '''eyJ\.\.\.local\.\.\.''',
+  '''replace-with-openssl-rand-base64-32''',
+  '''super-secret-local-jwt''',
+]

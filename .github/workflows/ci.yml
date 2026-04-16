@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+  TURBO_TELEMETRY_DISABLED: 1
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Install once; reuse node_modules via actions/cache across all jobs.
+  # ---------------------------------------------------------------------------
+  install:
+    name: Install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify lockfile unchanged
+        run: git diff --exit-code pnpm-lock.yaml
+
+  # ---------------------------------------------------------------------------
+  # Lint: ESLint + Prettier format check. Zero-warning policy on new code.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+
+  # ---------------------------------------------------------------------------
+  # Typecheck: full workspace graph. Strict mode enforced by tsconfig.base.
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  # ---------------------------------------------------------------------------
+  # Unit tests: Vitest across packages + services.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Unit tests
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  # ---------------------------------------------------------------------------
+  # Build: full turbo build, used as input to deploy jobs on merge.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Supabase migration sanity: verifies migration files are correctly named
+  # and ordered. Live drift detection runs in deploy-staging / deploy-production.
+  # ---------------------------------------------------------------------------
+  migration-sanity:
+    name: Migration filename sanity
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate migration filenames
+        run: |
+          set -euo pipefail
+          if ! ls supabase/migrations/*.sql >/dev/null 2>&1; then
+            echo "No migrations directory yet — skipping"
+            exit 0
+          fi
+          bad=$(ls supabase/migrations/ | grep -Ev '^(\.gitkeep|[0-9]{14}_[a-z0-9_]+\.sql)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Invalid migration filenames:"
+            echo "$bad"
+            exit 1
+          fi

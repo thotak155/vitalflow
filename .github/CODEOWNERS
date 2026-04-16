@@ -1,0 +1,37 @@
+# Default owners for everything
+*                                   @vitalflow/platform
+
+# App
+/apps/web/                          @vitalflow/platform
+/apps/web/src/app/(app)/admin/      @vitalflow/platform
+/apps/web/src/app/(app)/my/         @vitalflow/patient-ux
+/apps/web/src/app/(app)/            @vitalflow/clinical-ux
+/apps/web/src/nav/                  @vitalflow/design-system @vitalflow/platform
+
+# Shared packages
+/packages/ui/                       @vitalflow/design-system
+/packages/auth/                     @vitalflow/security
+/packages/ai/                       @vitalflow/ai
+/packages/integrations/             @vitalflow/platform
+/packages/types/                    @vitalflow/platform
+
+# Services
+/services/clinical-service/         @vitalflow/clinical
+/services/erp-service/              @vitalflow/erp
+/services/workflow-service/         @vitalflow/workflow
+/services/notification-service/     @vitalflow/platform
+/services/monetization-service/     @vitalflow/growth
+
+# Supabase / infra
+/supabase/                          @vitalflow/platform @vitalflow/security
+/.github/                           @vitalflow/platform
+/.github/workflows/deploy-*.yml     @vitalflow/platform @vitalflow/ops-production
+/.github/rulesets/                  @vitalflow/platform @vitalflow/ops-production
+
+# Env templates — changes to these require ops review
+/.env.example                       @vitalflow/platform
+/.env.staging.example               @vitalflow/platform @vitalflow/ops-production
+/.env.production.example            @vitalflow/platform @vitalflow/ops-production
+
+# Docs
+/docs/                              @vitalflow/platform

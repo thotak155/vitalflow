@@ -1,0 +1,99 @@
+/*
+ * VitalFlow design tokens.
+ *
+ * Every token is a CSS custom property prefixed with `--vf-` so tenants can
+ * override a subset at runtime (brand colors, radius) without rebuilding.
+ * Tailwind consumes these via the shared preset in @vitalflow/config/tailwind.
+ */
+
+:root {
+  /* Surface */
+  --vf-background: 0 0% 100%;
+  --vf-foreground: 222 47% 11%;
+  --vf-border: 214 32% 91%;
+  --vf-input: 214 32% 91%;
+  --vf-ring: 222 84% 50%;
+
+  /* Brand */
+  --vf-primary: 222 84% 50%;
+  --vf-primary-foreground: 0 0% 100%;
+  --vf-secondary: 210 40% 96%;
+  --vf-secondary-foreground: 222 47% 11%;
+
+  /* Neutral */
+  --vf-muted: 210 40% 96%;
+  --vf-muted-foreground: 215 16% 47%;
+  --vf-accent: 210 40% 96%;
+  --vf-accent-foreground: 222 47% 11%;
+
+  /* Status */
+  --vf-destructive: 0 84% 60%;
+  --vf-destructive-foreground: 0 0% 100%;
+  --vf-success: 142 71% 38%;
+  --vf-success-foreground: 0 0% 100%;
+  --vf-warning: 38 92% 45%;
+  --vf-warning-foreground: 222 47% 11%;
+  --vf-info: 199 89% 44%;
+  --vf-info-foreground: 0 0% 100%;
+
+  /* Clinical semantic colors (vital-sign ranges, alerts) */
+  --vf-clinical-critical: 0 84% 45%;
+  --vf-clinical-warning: 38 92% 50%;
+  --vf-clinical-normal: 142 71% 45%;
+  --vf-clinical-info: 199 89% 48%;
+
+  /* Geometry */
+  --vf-radius: 0.5rem;
+
+  /* Typography */
+  --vf-font-sans: "Inter", system-ui, sans-serif;
+  --vf-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Elevation */
+  --vf-shadow-sm: 0 1px 2px 0 hsl(var(--vf-foreground) / 0.05);
+  --vf-shadow-md: 0 4px 12px -2px hsl(var(--vf-foreground) / 0.08);
+  --vf-shadow-lg: 0 12px 32px -8px hsl(var(--vf-foreground) / 0.12);
+
+  /* Motion */
+  --vf-duration-fast: 120ms;
+  --vf-duration-normal: 200ms;
+  --vf-duration-slow: 320ms;
+  --vf-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* App shell geometry */
+  --vf-sidebar-width: 16rem;
+  --vf-sidebar-width-collapsed: 3.5rem;
+  --vf-topnav-height: 3.5rem;
+}
+
+.dark {
+  --vf-background: 222 47% 6%;
+  --vf-foreground: 210 40% 98%;
+  --vf-border: 217 32% 17%;
+  --vf-input: 217 32% 17%;
+  --vf-ring: 222 84% 60%;
+
+  --vf-primary: 222 84% 60%;
+  --vf-primary-foreground: 222 47% 11%;
+  --vf-secondary: 217 32% 17%;
+  --vf-secondary-foreground: 210 40% 98%;
+
+  --vf-muted: 217 32% 17%;
+  --vf-muted-foreground: 215 20% 65%;
+  --vf-accent: 217 32% 17%;
+  --vf-accent-foreground: 210 40% 98%;
+
+  --vf-destructive: 0 63% 45%;
+  --vf-destructive-foreground: 210 40% 98%;
+  --vf-success: 142 64% 45%;
+  --vf-success-foreground: 222 47% 6%;
+  --vf-warning: 38 92% 55%;
+  --vf-warning-foreground: 222 47% 6%;
+  --vf-info: 199 89% 55%;
+  --vf-info-foreground: 222 47% 6%;
+
+  --vf-clinical-critical: 0 84% 55%;
+  --vf-clinical-warning: 38 92% 55%;
+  --vf-clinical-normal: 142 71% 50%;
+  --vf-clinical-info: 199 89% 55%;
+}

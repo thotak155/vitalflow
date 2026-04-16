@@ -1,0 +1,115 @@
+name: Deploy · Staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  id-token: write
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck && pnpm test && pnpm build
+
+  # ---------------------------------------------------------------------------
+  # Apply Supabase migrations to staging FIRST. Failure aborts the app deploy.
+  # ---------------------------------------------------------------------------
+  migrate-db:
+    name: Migrate DB (staging)
+    needs: gate
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD_STAGING }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF_STAGING }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase link --project-ref "$PROJECT_REF"
+      - name: Dry-run migration diff
+        run: supabase db diff --linked --file /tmp/diff.sql && cat /tmp/diff.sql
+      - run: supabase db push --linked
+
+  deploy:
+    name: Deploy web (staging)
+    needs: migrate-db
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx vercel pull --yes --environment=staging --token=$VERCEL_TOKEN
+      - run: npx vercel build --token=$VERCEL_TOKEN
+      - run: npx vercel deploy --prebuilt --archive=tgz --token=$VERCEL_TOKEN --target=staging
+
+  smoke:
+    name: Smoke (staging)
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vitalflow/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @vitalflow/web test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: https://staging.vitalflow.health
+
+  notify:
+    name: Notify
+    needs: [deploy, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack post
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_DEPLOY }}
+          STATUS: ${{ (needs.deploy.result == 'success' && needs.smoke.result == 'success') && 'success' || 'failure' }}
+        run: |
+          curl -sS -X POST -H 'Content-type: application/json' --data "{
+            \"text\": \"VitalFlow staging deploy · $STATUS · ${{ github.sha }}\"
+          }" "$SLACK_WEBHOOK_URL"

@@ -1,0 +1,39 @@
+{
+  "name": "@vitalflow/clinical-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Clinical domain service: encounters, notes, orders, results, SOAP, signing workflow.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./encounters": "./src/encounters/index.ts",
+    "./notes": "./src/notes/index.ts",
+    "./orders": "./src/orders/index.ts"
+  },
+  "files": ["src", "dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rimraf dist .turbo"
+  },
+  "dependencies": {
+    "@vitalflow/ai": "workspace:*",
+    "@vitalflow/auth": "workspace:*",
+    "@vitalflow/integrations": "workspace:*",
+    "@vitalflow/shared-utils": "workspace:*",
+    "@vitalflow/types": "workspace:*",
+    "@vitalflow/workflows": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@vitalflow/config": "workspace:*",
+    "eslint": "^9.11.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

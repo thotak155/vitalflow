@@ -1,0 +1,47 @@
+{
+  "name": "@vitalflow/auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supabase auth wrappers, session helpers, RBAC/ABAC policy engine, tenant resolution middleware.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./server": "./src/server.ts",
+    "./middleware": "./src/middleware.ts",
+    "./rbac": "./src/rbac.ts",
+    "./guards": "./src/guards.ts",
+    "./impersonation": "./src/impersonation.ts"
+  },
+  "files": ["src", "dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rimraf dist .turbo"
+  },
+  "peerDependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "@vitalflow/shared-utils": "workspace:*",
+    "@vitalflow/types": "workspace:*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitalflow/config": "workspace:*",
+    "eslint": "^9.11.1",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}

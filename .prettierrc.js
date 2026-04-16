@@ -1,0 +1,25 @@
+/** @type {import("prettier").Config} */
+module.exports = {
+  semi: true,
+  singleQuote: false,
+  trailingComma: "all",
+  printWidth: 100,
+  tabWidth: 2,
+  useTabs: false,
+  arrowParens: "always",
+  bracketSpacing: true,
+  bracketSameLine: false,
+  endOfLine: "lf",
+  plugins: ["prettier-plugin-tailwindcss"],
+  tailwindFunctions: ["cn", "cva", "clsx", "tw"],
+  overrides: [
+    {
+      files: "*.md",
+      options: { proseWrap: "always" }
+    },
+    {
+      files: ["*.yml", "*.yaml"],
+      options: { singleQuote: false }
+    }
+  ]
+};

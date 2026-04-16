@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Changesets: on merge to main, opens a "Version Packages" PR that bumps
+  # versions based on the changesets added to merged PRs. When that version
+  # PR is merged, this job auto-creates a git tag `v<version>`, which in turn
+  # triggers deploy-production.yml.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Version + tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Create release PR or tag
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm version       # runs `changeset version` via package.json script
+          publish: pnpm release       # runs `changeset publish` (tags only; no npm publish here)
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}

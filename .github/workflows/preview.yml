@@ -1,0 +1,143 @@
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main, develop]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+env:
+  NODE_VERSION: "20.11.0"
+  PNPM_VERSION: "9.12.0"
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Create an ephemeral Supabase branch for this PR. Inherits schema from the
+  # `development` project; no PHI ever lives here.
+  # ---------------------------------------------------------------------------
+  db-branch:
+    name: Supabase branch (create)
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      branch-ref: ${{ steps.create.outputs.branch-ref }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_DEV }}
+      PARENT_REF: ${{ vars.SUPABASE_PROJECT_REF_DEV }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - id: create
+        run: |
+          set -euo pipefail
+          branch="pr-${{ github.event.pull_request.number }}"
+          supabase link --project-ref "$PARENT_REF"
+          if ! supabase branches get "$branch" >/dev/null 2>&1; then
+            supabase branches create "$branch" --persistent=false
+          fi
+          supabase db push --branch "$branch"
+          echo "branch-ref=$branch" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Deploy the single web app as a Vercel preview.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy preview
+    if: github.event.action != 'closed'
+    needs: db-branch
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: npx vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+      - run: npx vercel build --token=$VERCEL_TOKEN
+      - id: deploy
+        run: |
+          url=$(npx vercel deploy --prebuilt --token=$VERCEL_TOKEN)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Playwright smoke against the preview URL. Non-blocking on PRs.
+  # ---------------------------------------------------------------------------
+  smoke:
+    name: E2E smoke
+    if: github.event.action != 'closed'
+    needs: deploy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @vitalflow/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @vitalflow/web test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ needs.deploy.outputs.url }}
+
+  # ---------------------------------------------------------------------------
+  # Sticky PR comment with preview URL + Supabase branch.
+  # ---------------------------------------------------------------------------
+  comment:
+    name: Post preview URL
+    if: github.event.action != 'closed'
+    needs: [deploy, db-branch]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: vitalflow-preview
+          message: |
+            ### VitalFlow preview deployment
+
+            **App:** ${{ needs.deploy.outputs.url }}
+            **Supabase branch:** `${{ needs.db-branch.outputs.branch-ref }}`
+            (ephemeral, no PHI, auto-destroyed on PR close)
+
+            Updated on commit `${{ github.event.pull_request.head.sha }}`.
+
+  # ---------------------------------------------------------------------------
+  # Teardown on PR close/merge.
+  # ---------------------------------------------------------------------------
+  teardown:
+    name: Teardown preview
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_DEV }}
+      PARENT_REF: ${{ vars.SUPABASE_PROJECT_REF_DEV }}
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: |
+          branch="pr-${{ github.event.pull_request.number }}"
+          supabase link --project-ref "$PARENT_REF" || true
+          supabase branches delete "$branch" --yes || true

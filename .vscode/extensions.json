@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "supabase.supabase-vscode",
+    "prisma.prisma",
+    "ms-playwright.playwright",
+    "figma.figma-vscode-extension",
+    "vercel.vercel-vscode",
+    "usernamehw.errorlens",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
