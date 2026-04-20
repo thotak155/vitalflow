@@ -1,3 +1,4 @@
+import { createVitalFlowServerClient } from "@vitalflow/auth/server";
 import {
   Button,
   Card,
@@ -7,38 +8,33 @@ import {
   FormField,
   Input,
 } from "@vitalflow/ui";
-import { AlertCircle, CheckCircle2, HeartPulse } from "@vitalflow/ui/icons";
-import { createVitalFlowServerClient } from "@vitalflow/auth/server";
+import { AlertCircle, HeartPulse } from "@vitalflow/ui/icons";
+import NextLink from "next/link";
 import { redirect } from "next/navigation";
 
 interface LoginSearchParams {
   next?: string;
-  sent?: string;
   error?: string;
+  reset?: string;
 }
 
-async function sendMagicLink(formData: FormData): Promise<void> {
+async function signIn(formData: FormData): Promise<void> {
   "use server";
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
   const next = safeNext(String(formData.get("next") ?? ""));
 
-  if (!email || !email.includes("@")) {
-    redirect(`/login?error=${encodeURIComponent("Enter a valid email")}`);
+  if (!email || !email.includes("@") || !password) {
+    redirect(`/login?error=${encodeURIComponent("Enter your email and password")}`);
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const supabase = await createVitalFlowServerClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`,
-    },
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect(`/login?error=${encodeURIComponent("Invalid email or password")}`);
   }
-  redirect(`/login?sent=1`);
+  redirect(next);
 }
 
 function safeNext(raw: string): string {
@@ -51,8 +47,9 @@ export default async function LoginPage({
   searchParams: Promise<LoginSearchParams>;
 }) {
   const params = await searchParams;
-  const sent = params.sent === "1";
   const error = params.error;
+  const resetSent = params.reset === "sent";
+  const passwordChanged = params.reset === "done";
   const next = safeNext(params.next ?? "/");
 
   return (
@@ -64,19 +61,24 @@ export default async function LoginPage({
         </div>
         <CardTitle>Sign in</CardTitle>
         <p className="text-sm text-muted-foreground">
-          We&apos;ll email you a one-time link &mdash; no password required.
+          Use the credentials your administrator set up for you.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {sent ? (
+        {resetSent ? (
           <div
             role="status"
-            className="flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-foreground"
+            className="rounded-md border border-success/30 bg-success/5 p-3 text-sm"
           >
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
-            <span>
-              Check your inbox &mdash; the magic link expires in 10 minutes. It&apos;s safe to close this tab.
-            </span>
+            If an account exists for that email, we sent a password reset link.
+          </div>
+        ) : null}
+        {passwordChanged ? (
+          <div
+            role="status"
+            className="rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          >
+            Password updated. Sign in with your new password.
           </div>
         ) : null}
         {error ? (
@@ -88,7 +90,7 @@ export default async function LoginPage({
             <span>{error}</span>
           </div>
         ) : null}
-        <form action={sendMagicLink} className="space-y-4">
+        <form action={signIn} className="space-y-4">
           <input type="hidden" name="next" value={next} />
           <FormField label="Email" htmlFor="email" required>
             <Input
@@ -100,10 +102,25 @@ export default async function LoginPage({
               placeholder="you@example.com"
             />
           </FormField>
+          <FormField label="Password" htmlFor="password" required>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              minLength={12}
+            />
+          </FormField>
           <Button type="submit" className="w-full">
-            Send magic link
+            Sign in
           </Button>
         </form>
+        <div className="text-center text-sm">
+          <NextLink href="/forgot-password" className="text-primary hover:underline">
+            Forgot your password?
+          </NextLink>
+        </div>
       </CardContent>
     </Card>
   );
