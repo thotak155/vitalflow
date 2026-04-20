@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { logEventBestEffort } from "@vitalflow/auth/audit";
 import { requirePermission } from "@vitalflow/auth/rbac";
 import {
   createVitalFlowServerClient,
@@ -55,6 +56,7 @@ type NoteRow = {
   signed_at: string | null;
   version: number;
   updated_at: string;
+  amended_from: string | null;
 };
 
 type VitalsRow = {
@@ -310,6 +312,126 @@ async function signNote(formData: FormData): Promise<void> {
   redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Note signed")}`);
 }
 
+async function amendNote(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) {
+    redirect("/login");
+  }
+  requirePermission(session, "clinical:amend");
+
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  const noteId = String(formData.get("note_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!noteId) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Missing note id")}`);
+  }
+  if (reason.length < 5) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        "Amendment reason is required (5+ characters)",
+      )}`,
+    );
+  }
+
+  const supabase = await createVitalFlowServerClient();
+
+  // Fetch the current note. Must be signed to be amendable.
+  const { data: currentRaw } = await supabase
+    .from("encounter_notes")
+    .select(
+      "id, encounter_id, patient_id, type, status, subjective, objective, assessment, plan, version",
+    )
+    .eq("id", noteId)
+    .eq("tenant_id", session.tenantId)
+    .maybeSingle();
+  const current = currentRaw as {
+    id: string;
+    encounter_id: string;
+    patient_id: string;
+    type: string;
+    status: string;
+    subjective: string | null;
+    objective: string | null;
+    assessment: string | null;
+    plan: string | null;
+    version: number;
+  } | null;
+  if (!current) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Note not found")}`);
+  }
+  if (current.status !== "signed") {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        "Only signed notes can be amended — drafts are editable in place",
+      )}`,
+    );
+  }
+
+  // Insert new draft that carries forward prior content. Not atomic with the
+  // status flip below — an RPC wrapping both writes lands with the billing
+  // work (same pattern as sign-note). Worst case on partial failure: a fresh
+  // draft without the old note flipped to 'amended', caught on next render.
+  const insertRes = await tbl(supabase, "encounter_notes")
+    .insert({
+      tenant_id: session.tenantId,
+      encounter_id: current.encounter_id,
+      patient_id: current.patient_id,
+      author_id: session.userId,
+      type: current.type,
+      status: "draft",
+      subjective: current.subjective,
+      objective: current.objective,
+      assessment: current.assessment,
+      plan: current.plan,
+      amended_from: current.id,
+      version: current.version + 1,
+    })
+    .select("id")
+    .single();
+  if (insertRes.error || !insertRes.data) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        insertRes.error?.message ?? "Failed to create amendment",
+      )}`,
+    );
+  }
+
+  const { error: flipErr } = await tbl(supabase, "encounter_notes")
+    .update({ status: "amended" })
+    .eq("id", current.id)
+    .eq("tenant_id", session.tenantId);
+  if (flipErr) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        `Created v${current.version + 1} but failed to supersede v${current.version}: ${flipErr.message}`,
+      )}`,
+    );
+  }
+
+  // Emit the semantic audit event with the amendment reason. Row-level audit
+  // trigger already captured the before/after diff for both rows.
+  await logEventBestEffort({
+    tenantId: session.tenantId,
+    actorId: session.userId,
+    eventType: "note.amended",
+    targetTable: "encounter_notes",
+    targetRowId: insertRes.data.id,
+    details: {
+      amended_from: current.id,
+      from_version: current.version,
+      to_version: current.version + 1,
+      reason,
+    },
+  });
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(
+    `/encounters/${encounterId}?ok=${encodeURIComponent(`Amended — v${current.version + 1} draft ready`)}`,
+  );
+}
+
 async function recordVitals(formData: FormData): Promise<void> {
   "use server";
   const session = await getSession();
@@ -409,19 +531,44 @@ export default async function EncounterWorkspacePage({
     notFound();
   }
 
-  // Active note: latest non-amended revision for this encounter.
+  // Active note: latest version that is not yet superseded. After an amendment
+  // the previous version is flipped to status='amended' and a new draft row is
+  // inserted with `amended_from` pointing at it. The "tip" of the chain is the
+  // only row whose status is NOT 'amended'.
   const { data: noteRaw } = await supabase
     .from("encounter_notes")
     .select(
-      "id, encounter_id, patient_id, author_id, type, status, subjective, objective, assessment, plan, signed_by, signed_at, version, updated_at",
+      "id, encounter_id, patient_id, author_id, type, status, subjective, objective, assessment, plan, signed_by, signed_at, version, updated_at, amended_from",
     )
     .eq("encounter_id", id)
     .eq("tenant_id", session.tenantId)
-    .is("amended_from", null)
+    .neq("status", "amended")
     .order("version", { ascending: false })
     .limit(1)
     .maybeSingle();
   const note = noteRaw as NoteRow | null;
+
+  // Full history for the panel — every version including superseded ones.
+  const { data: historyRaw } = await supabase
+    .from("encounter_notes")
+    .select(
+      "id, version, status, author_id, signed_at, signed_by, amended_from, updated_at, " +
+        "author:author_id(full_name, email)",
+    )
+    .eq("encounter_id", id)
+    .eq("tenant_id", session.tenantId)
+    .order("version", { ascending: false });
+  const history = (historyRaw ?? []) as unknown as {
+    id: string;
+    version: number;
+    status: string;
+    author_id: string;
+    signed_at: string | null;
+    signed_by: string | null;
+    amended_from: string | null;
+    updated_at: string;
+    author: { full_name: string | null; email: string } | null;
+  }[];
 
   const { data: vitalsRaw } = await supabase
     .from("vitals")
@@ -439,8 +586,10 @@ export default async function EncounterWorkspacePage({
 
   const canWrite = session.permissions.includes("clinical:write");
   const canSign = session.permissions.includes("clinical:sign");
+  const canAmend = session.permissions.includes("clinical:amend");
   const canRecordVitals = session.permissions.includes("patient:write");
   const noteSigned = note?.status === "signed";
+  const noteIsAmendment = note?.amended_from !== null && note?.amended_from !== undefined;
   const encounterFinished = encounter.status === "finished" || encounter.status === "cancelled";
 
   return (
@@ -647,86 +796,165 @@ export default async function EncounterWorkspacePage({
           </CardHeader>
           <CardContent>
             {noteSigned && note ? (
-              <div className="space-y-4 text-sm">
-                <p className="text-xs text-muted-foreground">
-                  Signed {note.signed_at ? new Date(note.signed_at).toLocaleString() : ""} — amend to add an addendum.
-                </p>
-                {(["subjective", "objective", "assessment", "plan"] as const).map((k) => (
-                  <div key={k}>
-                    <div className="text-xs font-medium uppercase text-muted-foreground">{k}</div>
-                    <div className="whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">
-                      {note[k] ?? "—"}
+              <>
+                <div className="space-y-4 text-sm">
+                  <p className="text-xs text-muted-foreground">
+                    Signed {note.signed_at ? new Date(note.signed_at).toLocaleString() : ""} — use
+                    Amend below to create a new version.
+                  </p>
+                  {(["subjective", "objective", "assessment", "plan"] as const).map((k) => (
+                    <div key={k}>
+                      <div className="text-xs font-medium uppercase text-muted-foreground">{k}</div>
+                      <div className="whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">
+                        {note[k] ?? "—"}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : canWrite ? (
-              <form action={saveNoteDraft} className="space-y-4">
-                <input type="hidden" name="encounter_id" value={encounter.id} />
-                <input type="hidden" name="patient_id" value={encounter.patient_id} />
-                {note?.id ? <input type="hidden" name="note_id" value={note.id} /> : null}
-                <FormField label="Subjective" htmlFor="subjective" helper="HPI, ROS, patient-reported.">
-                  <Textarea
-                    id="subjective"
-                    name="subjective"
-                    rows={4}
-                    defaultValue={note?.subjective ?? ""}
-                  />
-                </FormField>
-                <FormField label="Objective" htmlFor="objective" helper="Exam findings, results.">
-                  <Textarea
-                    id="objective"
-                    name="objective"
-                    rows={4}
-                    defaultValue={note?.objective ?? ""}
-                  />
-                </FormField>
-                <FormField label="Assessment" htmlFor="assessment" helper="Diagnoses, differential.">
-                  <Textarea
-                    id="assessment"
-                    name="assessment"
-                    rows={3}
-                    defaultValue={note?.assessment ?? ""}
-                  />
-                </FormField>
-                <FormField label="Plan" htmlFor="plan" helper="Orders, follow-up, patient education.">
-                  <Textarea id="plan" name="plan" rows={3} defaultValue={note?.plan ?? ""} />
-                </FormField>
-                <div className="flex items-center gap-2">
-                  <Button type="submit" variant="outline">
-                    Save draft
-                  </Button>
+                  ))}
                 </div>
-              </form>
+
+                {canAmend ? (
+                  <form
+                    action={amendNote}
+                    className="mt-6 space-y-3 rounded-md border border-warning/30 bg-warning/5 p-4"
+                  >
+                    <input type="hidden" name="encounter_id" value={encounter.id} />
+                    <input type="hidden" name="note_id" value={note.id} />
+                    <div className="text-sm font-medium">Amend this note</div>
+                    <p className="text-xs text-muted-foreground">
+                      Creates a new draft version (v{note.version + 1}) pre-filled with the current
+                      content. The current version stays in the record as <code>amended</code>. A
+                      reason is required and logged to the audit trail.
+                    </p>
+                    <FormField label="Reason for amendment" htmlFor="reason" required>
+                      <Textarea
+                        id="reason"
+                        name="reason"
+                        rows={2}
+                        required
+                        minLength={5}
+                        placeholder="Clerical correction, late-arriving result, clarification…"
+                      />
+                    </FormField>
+                    <Button type="submit" variant="outline">
+                      Start amendment
+                    </Button>
+                  </form>
+                ) : null}
+              </>
+            ) : canWrite ? (
+              <>
+                {noteIsAmendment && note ? (
+                  <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
+                    <strong>Amending:</strong> this is v{note.version} (supersedes v{note.version - 1}).
+                    Prior content is pre-filled. Save and sign when ready.
+                  </div>
+                ) : null}
+
+                <form action={saveNoteDraft} className="space-y-4">
+                  <input type="hidden" name="encounter_id" value={encounter.id} />
+                  <input type="hidden" name="patient_id" value={encounter.patient_id} />
+                  {note?.id ? <input type="hidden" name="note_id" value={note.id} /> : null}
+                  <FormField label="Subjective" htmlFor="subjective" helper="HPI, ROS, patient-reported.">
+                    <Textarea
+                      id="subjective"
+                      name="subjective"
+                      rows={4}
+                      defaultValue={note?.subjective ?? ""}
+                    />
+                  </FormField>
+                  <FormField label="Objective" htmlFor="objective" helper="Exam findings, results.">
+                    <Textarea
+                      id="objective"
+                      name="objective"
+                      rows={4}
+                      defaultValue={note?.objective ?? ""}
+                    />
+                  </FormField>
+                  <FormField label="Assessment" htmlFor="assessment" helper="Diagnoses, differential.">
+                    <Textarea
+                      id="assessment"
+                      name="assessment"
+                      rows={3}
+                      defaultValue={note?.assessment ?? ""}
+                    />
+                  </FormField>
+                  <FormField label="Plan" htmlFor="plan" helper="Orders, follow-up, patient education.">
+                    <Textarea id="plan" name="plan" rows={3} defaultValue={note?.plan ?? ""} />
+                  </FormField>
+                  <div className="flex items-center gap-2">
+                    <Button type="submit" variant="outline">
+                      Save draft
+                    </Button>
+                  </div>
+                </form>
+
+                {canSign && note && note.status !== "signed" ? (
+                  <form
+                    action={signNote}
+                    className="mt-6 space-y-3 rounded-md border border-success/30 bg-success/5 p-4"
+                  >
+                    <input type="hidden" name="encounter_id" value={encounter.id} />
+                    <input type="hidden" name="note_id" value={note.id} />
+                    <div className="text-sm font-medium">Ready to sign?</div>
+                    <p className="text-xs text-muted-foreground">
+                      Signing freezes the note at this version. A SHA-256 hash of the content is
+                      written to <code>public.signatures</code> with your user id. Amendments create
+                      a new version.
+                    </p>
+                    <FormField
+                      label="Attestation"
+                      htmlFor="attestation"
+                      helper="The text stored with your signature."
+                    >
+                      <Input
+                        id="attestation"
+                        name="attestation"
+                        defaultValue="Reviewed and attested to by signer."
+                      />
+                    </FormField>
+                    <Button type="submit">Sign note</Button>
+                  </form>
+                ) : null}
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">No note yet.</p>
             )}
-
-            {canSign && note && note.status !== "signed" ? (
-              <form action={signNote} className="mt-6 space-y-3 rounded-md border border-success/30 bg-success/5 p-4">
-                <input type="hidden" name="encounter_id" value={encounter.id} />
-                <input type="hidden" name="note_id" value={note.id} />
-                <div className="text-sm font-medium">Ready to sign?</div>
-                <p className="text-xs text-muted-foreground">
-                  Signing freezes the note at this version. A SHA-256 hash of the content is written
-                  to <code>public.signatures</code> with your user id. Amendments create a new version.
-                </p>
-                <FormField
-                  label="Attestation"
-                  htmlFor="attestation"
-                  helper="The text stored with your signature."
-                >
-                  <Input
-                    id="attestation"
-                    name="attestation"
-                    defaultValue="Reviewed and attested to by signer."
-                  />
-                </FormField>
-                <Button type="submit">Sign note</Button>
-              </form>
-            ) : null}
           </CardContent>
         </Card>
+
+        {/* Version history */}
+        {history.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Version history ({history.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="divide-y text-sm">
+                {history.map((h) => (
+                  <li key={h.id} className="flex items-center justify-between py-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">v{h.version}</span>
+                        <Badge variant={NOTE_STATUS_VARIANTS[h.status] ?? "default"}>
+                          {h.status}
+                        </Badge>
+                        {h.amended_from ? (
+                          <span className="text-xs text-muted-foreground">(amendment)</span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {h.author?.full_name ?? h.author?.email ?? "—"} ·{" "}
+                        {h.signed_at
+                          ? `signed ${new Date(h.signed_at).toLocaleString()}`
+                          : `updated ${new Date(h.updated_at).toLocaleString()}`}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </>
   );
