@@ -147,6 +147,87 @@ async function cancelAppointment(formData: FormData): Promise<void> {
   redirect(`/appointments/${id}?ok=${encodeURIComponent("Appointment cancelled")}`);
 }
 
+async function openEncounter(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) {
+    redirect("/login");
+  }
+  requirePermission(session, "clinical:write");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) {
+    redirect(`/appointments?error=${encodeURIComponent("Missing appointment id")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { data: apptRaw } = await supabase
+    .from("appointments")
+    .select("id, patient_id, provider_id, encounter_id, start_at, reason, status")
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId)
+    .maybeSingle();
+  const appt = apptRaw as {
+    id: string;
+    patient_id: string;
+    provider_id: string;
+    encounter_id: string | null;
+    start_at: string;
+    reason: string | null;
+    status: string;
+  } | null;
+  if (!appt) {
+    redirect(`/appointments?error=${encodeURIComponent("Appointment not found")}`);
+  }
+  if (appt.encounter_id) {
+    redirect(`/encounters/${appt.encounter_id}`);
+  }
+
+  // Create encounter in-progress, link back from the appointment.
+  const encInsert = await (supabase as unknown as {
+    from: (t: string) => {
+      insert: (v: Record<string, unknown>) => {
+        select: (s: string) => {
+          single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .from("encounters")
+    .insert({
+      tenant_id: session.tenantId,
+      patient_id: appt.patient_id,
+      provider_id: appt.provider_id,
+      class: "ambulatory",
+      status: "in_progress",
+      start_at: appt.start_at,
+      reason: appt.reason,
+    })
+    .select("id")
+    .single();
+  if (encInsert.error || !encInsert.data) {
+    redirect(
+      `/appointments/${id}?error=${encodeURIComponent(
+        encInsert.error?.message ?? "Failed to open encounter",
+      )}`,
+    );
+  }
+
+  // Link the appointment and advance its status if not already in progress.
+  const { error: apptErr } = await apptsTable(supabase)
+    .update({
+      encounter_id: encInsert.data.id,
+      status: appt.status === "completed" ? appt.status : "in_progress",
+    })
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (apptErr) {
+    redirect(`/appointments/${id}?error=${encodeURIComponent(apptErr.message)}`);
+  }
+
+  redirect(`/encounters/${encInsert.data.id}`);
+}
+
 async function updateDetails(formData: FormData): Promise<void> {
   "use server";
   const session = await getSession();
@@ -266,11 +347,25 @@ export default async function AppointmentDetailPage({
           </span>
         }
         actions={
-          appt.patient ? (
-            <Button asChild variant="outline">
-              <NextLink href={`/patients/${appt.patient_id}`}>Open chart</NextLink>
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            {appt.encounter_id ? (
+              <Button asChild>
+                <NextLink href={`/encounters/${appt.encounter_id}`}>Open encounter</NextLink>
+              </Button>
+            ) : canWrite &&
+              session.permissions.includes("clinical:write") &&
+              isActive ? (
+              <form action={openEncounter}>
+                <input type="hidden" name="id" value={appt.id} />
+                <Button type="submit">Open encounter</Button>
+              </form>
+            ) : null}
+            {appt.patient ? (
+              <Button asChild variant="outline">
+                <NextLink href={`/patients/${appt.patient_id}`}>Open chart</NextLink>
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -435,10 +530,19 @@ export default async function AppointmentDetailPage({
             <CardTitle>Encounter</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              The encounter workspace ships with the next slice. Once available, &ldquo;Start visit&rdquo;
-              will open an encounter linked to this appointment.
-            </p>
+            {appt.encounter_id ? (
+              <p className="text-sm">
+                Encounter linked.{" "}
+                <NextLink href={`/encounters/${appt.encounter_id}`} className="text-primary hover:underline">
+                  Open encounter →
+                </NextLink>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No encounter yet. Click <strong>Open encounter</strong> above to start the visit and
+                open the clinical workspace.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
