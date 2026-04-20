@@ -15,6 +15,12 @@ import {
   CardTitle,
   FormField,
   Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   Textarea,
 } from "@vitalflow/ui";
 import { AlertCircle, CheckCircle2 } from "@vitalflow/ui/icons";
@@ -39,6 +45,16 @@ type EncounterRow = {
   chief_complaint: string | null;
   patient: { given_name: string; family_name: string; mrn: string; date_of_birth: string } | null;
   provider: { full_name: string | null; email: string } | null;
+};
+
+type DiagnosisRow = {
+  id: string;
+  code_system: string;
+  code: string;
+  description: string;
+  rank: number;
+  pointer: string | null;
+  assigned_at: string;
 };
 
 type NoteRow = {
@@ -312,6 +328,110 @@ async function signNote(formData: FormData): Promise<void> {
   redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Note signed")}`);
 }
 
+async function assignDiagnosis(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "clinical:write");
+
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  const patientId = String(formData.get("patient_id") ?? "");
+  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const description = String(formData.get("description") ?? "").trim();
+
+  if (!encounterId || !patientId || !code || !description) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent("Code and description are required")}`,
+    );
+  }
+  if (!/^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/.test(code)) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        "ICD-10 code format looks off (e.g. E11.9, J45.40)",
+      )}`,
+    );
+  }
+
+  const supabase = await createVitalFlowServerClient();
+
+  // Compute next rank = max(rank)+1 among active assignments.
+  const { data: maxRaw } = await supabase
+    .from("diagnosis_assignments")
+    .select("rank")
+    .eq("encounter_id", encounterId)
+    .eq("tenant_id", session.tenantId)
+    .is("removed_at", null)
+    .order("rank", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const maxRow = maxRaw as { rank: number } | null;
+  const nextRank = (maxRow?.rank ?? 0) + 1;
+  if (nextRank > 12) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(
+        "Max 12 active diagnoses per encounter",
+      )}`,
+    );
+  }
+
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    };
+  })
+    .from("diagnosis_assignments")
+    .insert({
+      tenant_id: session.tenantId,
+      patient_id: patientId,
+      encounter_id: encounterId,
+      code_system: "icd10-cm",
+      code,
+      description,
+      rank: nextRank,
+      assigned_by: session.userId,
+    });
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent(`Added ${code} at rank ${nextRank}`)}`);
+}
+
+async function removeDiagnosis(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "clinical:write");
+
+  const id = String(formData.get("id") ?? "");
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  if (!id || !encounterId) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Missing diagnosis id")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      update: (v: Record<string, unknown>) => {
+        eq: (c: string, v: string) => {
+          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .from("diagnosis_assignments")
+    .update({ removed_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Diagnosis removed")}`);
+}
+
 async function amendNote(formData: FormData): Promise<void> {
   "use server";
   const session = await getSession();
@@ -580,6 +700,15 @@ export default async function EncounterWorkspacePage({
     .order("recorded_at", { ascending: false });
   const vitals = (vitalsRaw ?? []) as unknown as VitalsRow[];
 
+  const { data: diagnosesRaw } = await supabase
+    .from("diagnosis_assignments")
+    .select("id, code_system, code, description, rank, pointer, assigned_at")
+    .eq("encounter_id", id)
+    .eq("tenant_id", session.tenantId)
+    .is("removed_at", null)
+    .order("rank", { ascending: true });
+  const diagnoses = (diagnosesRaw ?? []) as unknown as DiagnosisRow[];
+
   const displayName = encounter.patient
     ? `${encounter.patient.given_name} ${encounter.patient.family_name}`
     : "Encounter";
@@ -703,6 +832,89 @@ export default async function EncounterWorkspacePage({
                 </div>
               </dl>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Diagnoses */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Diagnoses ({diagnoses.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {diagnoses.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Rank</TableHead>
+                    <TableHead className="w-32">Code</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-40 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {diagnoses.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium">{d.rank}</TableCell>
+                      <TableCell className="font-mono text-xs">{d.code}</TableCell>
+                      <TableCell>{d.description}</TableCell>
+                      <TableCell className="text-right">
+                        {canWrite && !encounterFinished ? (
+                          <form action={removeDiagnosis} className="inline">
+                            <input type="hidden" name="id" value={d.id} />
+                            <input type="hidden" name="encounter_id" value={encounter.id} />
+                            <Button type="submit" size="sm" variant="outline">
+                              Remove
+                            </Button>
+                          </form>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="mb-4 text-sm text-muted-foreground">
+                No diagnoses assigned. Add at least one before signing the note for claim generation.
+              </p>
+            )}
+
+            {canWrite && !encounterFinished ? (
+              <form
+                action={assignDiagnosis}
+                className="mt-4 space-y-3 rounded-md border border-dashed border-border p-4"
+              >
+                <input type="hidden" name="encounter_id" value={encounter.id} />
+                <input type="hidden" name="patient_id" value={encounter.patient_id} />
+                <div className="grid gap-3 md:grid-cols-[160px,1fr,auto]">
+                  <FormField label="ICD-10 code" htmlFor="code" required>
+                    <Input
+                      id="code"
+                      name="code"
+                      required
+                      placeholder="E11.9"
+                      className="font-mono"
+                      autoComplete="off"
+                    />
+                  </FormField>
+                  <FormField label="Description" htmlFor="description" required>
+                    <Input
+                      id="description"
+                      name="description"
+                      required
+                      placeholder="Type 2 diabetes without complications"
+                      autoComplete="off"
+                    />
+                  </FormField>
+                  <div className="flex items-end">
+                    <Button type="submit">Add</Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Rank is assigned automatically (next available). Full ICD-10 dictionary lookup ships
+                  with the billing surface — for now, type the code + description by hand.
+                </p>
+              </form>
+            ) : null}
           </CardContent>
         </Card>
 

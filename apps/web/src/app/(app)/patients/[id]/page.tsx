@@ -51,6 +51,23 @@ type ContactRow = {
   verified_at: string | null;
 };
 
+type CoverageRow = {
+  id: string;
+  payer_id: string;
+  type: string;
+  plan_name: string | null;
+  member_id: string;
+  group_number: string | null;
+  subscriber_name: string | null;
+  relationship: string | null;
+  effective_start: string | null;
+  effective_end: string | null;
+  active: boolean;
+  payer: { name: string; payer_code: string | null } | null;
+};
+
+type PayerOption = { id: string; name: string };
+
 const CONTACT_TYPES = [
   { value: "phone_mobile", label: "Mobile phone" },
   { value: "phone_home", label: "Home phone" },
@@ -92,11 +109,15 @@ type WritableContactsTable = {
     };
   };
 };
+type WritableCoveragesTable = WritableContactsTable;
 function patientsTable(c: SupabaseServerClient): WritablePatientsTable {
   return (c as unknown as { from: (t: string) => WritablePatientsTable }).from("patients");
 }
 function contactsTable(c: SupabaseServerClient): WritableContactsTable {
   return (c as unknown as { from: (t: string) => WritableContactsTable }).from("patient_contacts");
+}
+function coveragesTable(c: SupabaseServerClient): WritableCoveragesTable {
+  return (c as unknown as { from: (t: string) => WritableCoveragesTable }).from("patient_coverages");
 }
 
 async function updatePatient(formData: FormData): Promise<void> {
@@ -197,6 +218,83 @@ async function removeContact(formData: FormData): Promise<void> {
   redirect(`/patients/${patientId}?ok=${encodeURIComponent("Contact removed")}`);
 }
 
+async function addCoverage(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "patient:write");
+
+  const patientId = String(formData.get("patient_id") ?? "");
+  const payerId = String(formData.get("payer_id") ?? "");
+  const type = String(formData.get("type") ?? "").trim();
+  const memberId = String(formData.get("member_id") ?? "").trim();
+  const planName = String(formData.get("plan_name") ?? "").trim();
+  const groupNumber = String(formData.get("group_number") ?? "").trim();
+  const subscriberName = String(formData.get("subscriber_name") ?? "").trim();
+  const relationship = String(formData.get("relationship") ?? "").trim();
+  const effectiveStart = String(formData.get("effective_start") ?? "").trim();
+  const effectiveEnd = String(formData.get("effective_end") ?? "").trim();
+
+  if (!patientId || !payerId || !type || !memberId) {
+    redirect(
+      `/patients/${patientId}?error=${encodeURIComponent(
+        "Payer, coverage type, and member id are required",
+      )}`,
+    );
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await coveragesTable(supabase).insert({
+    tenant_id: session.tenantId,
+    patient_id: patientId,
+    payer_id: payerId,
+    type,
+    plan_name: planName || null,
+    member_id: memberId,
+    group_number: groupNumber || null,
+    subscriber_name: subscriberName || null,
+    relationship: relationship || null,
+    effective_start: effectiveStart || null,
+    effective_end: effectiveEnd || null,
+    currency: "USD",
+    active: true,
+  });
+  if (error) {
+    redirect(`/patients/${patientId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/patients/${patientId}`);
+  redirect(`/patients/${patientId}?ok=${encodeURIComponent("Coverage added")}`);
+}
+
+async function setCoverageActive(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "patient:write");
+
+  const id = String(formData.get("id") ?? "");
+  const patientId = String(formData.get("patient_id") ?? "");
+  const next = formData.get("active") === "1";
+  if (!id || !patientId) {
+    redirect(`/patients?error=${encodeURIComponent("Missing ids")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await coveragesTable(supabase)
+    .update({ active: next })
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (error) {
+    redirect(`/patients/${patientId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/patients/${patientId}`);
+  redirect(
+    `/patients/${patientId}?ok=${encodeURIComponent(next ? "Coverage activated" : "Coverage deactivated")}`,
+  );
+}
+
 export default async function PatientDetailPage({
   params,
   searchParams,
@@ -238,6 +336,25 @@ export default async function PatientDetailPage({
     .order("is_primary", { ascending: false })
     .order("created_at", { ascending: true });
   const contacts = (contactsRaw ?? []) as unknown as ContactRow[];
+
+  const { data: coveragesRaw } = await supabase
+    .from("patient_coverages")
+    .select(
+      "id, payer_id, type, plan_name, member_id, group_number, subscriber_name, relationship, effective_start, effective_end, active, payer:payer_id(name, payer_code)",
+    )
+    .eq("patient_id", id)
+    .eq("tenant_id", session.tenantId)
+    .order("active", { ascending: false })
+    .order("type", { ascending: true });
+  const coverages = (coveragesRaw ?? []) as unknown as CoverageRow[];
+
+  const { data: payersRaw } = await supabase
+    .from("payers")
+    .select("id, name")
+    .eq("tenant_id", session.tenantId)
+    .eq("active", true)
+    .order("name", { ascending: true });
+  const payers = (payersRaw ?? []) as unknown as PayerOption[];
 
   const displayName = patient.preferred_name
     ? `${patient.preferred_name} (${patient.given_name}) ${patient.family_name}`
@@ -439,13 +556,139 @@ export default async function PatientDetailPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Coverages</CardTitle>
+            <CardTitle>Coverages ({coverages.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Insurance coverage editing ships with the billing surface (next slice). Data already
-              stores in <code>patient_coverages</code>.
-            </p>
+            {coverages.length > 0 ? (
+              <ul className="mb-4 divide-y text-sm">
+                {coverages.map((c) => (
+                  <li key={c.id} className="flex items-start justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{c.payer?.name ?? "Unknown payer"}</span>
+                        <Badge variant={c.type === "primary" ? "success" : "muted"}>
+                          {c.type.replace(/_/g, " ")}
+                        </Badge>
+                        {c.active ? null : <Badge variant="muted">Inactive</Badge>}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>
+                          Member <span className="font-mono">{c.member_id}</span>
+                        </span>
+                        {c.plan_name ? <span>{c.plan_name}</span> : null}
+                        {c.group_number ? <span>Group {c.group_number}</span> : null}
+                        {c.subscriber_name ? (
+                          <span>
+                            Subscriber {c.subscriber_name}
+                            {c.relationship ? ` (${c.relationship})` : ""}
+                          </span>
+                        ) : null}
+                        {c.effective_start || c.effective_end ? (
+                          <span>
+                            {c.effective_start ?? "—"} → {c.effective_end ?? "open"}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {canWrite ? (
+                      <form action={setCoverageActive}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <input type="hidden" name="patient_id" value={patient.id} />
+                        <input type="hidden" name="active" value={c.active ? "0" : "1"} />
+                        <Button type="submit" size="sm" variant="outline">
+                          {c.active ? "Deactivate" : "Activate"}
+                        </Button>
+                      </form>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {canWrite ? (
+              payers.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border p-4 text-sm">
+                  <p>
+                    No active payers yet. Go to{" "}
+                    <NextLink href="/admin/payers" className="text-primary hover:underline">
+                      Admin → Payers
+                    </NextLink>{" "}
+                    to add one, then come back to attach coverage.
+                  </p>
+                </div>
+              ) : (
+                <form
+                  action={addCoverage}
+                  className="space-y-3 rounded-md border border-dashed border-border p-4"
+                >
+                  <input type="hidden" name="patient_id" value={patient.id} />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <FormField label="Payer" htmlFor="payer_id" required>
+                      <Select name="payer_id">
+                        <SelectTrigger id="payer_id">
+                          <SelectValue placeholder="Select a payer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {payers.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField label="Type" htmlFor="cov-type" required>
+                      <Select name="type" defaultValue="primary">
+                        <SelectTrigger id="cov-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="primary">Primary</SelectItem>
+                          <SelectItem value="secondary">Secondary</SelectItem>
+                          <SelectItem value="tertiary">Tertiary</SelectItem>
+                          <SelectItem value="self_pay">Self-pay</SelectItem>
+                          <SelectItem value="workers_comp">Workers comp</SelectItem>
+                          <SelectItem value="auto">Auto</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField label="Member ID" htmlFor="member_id" required>
+                      <Input id="member_id" name="member_id" required />
+                    </FormField>
+                    <FormField label="Plan name" htmlFor="plan_name">
+                      <Input id="plan_name" name="plan_name" placeholder="PPO Gold" />
+                    </FormField>
+                    <FormField label="Group number" htmlFor="group_number">
+                      <Input id="group_number" name="group_number" />
+                    </FormField>
+                    <FormField label="Subscriber name" htmlFor="subscriber_name" helper="If not the patient.">
+                      <Input id="subscriber_name" name="subscriber_name" />
+                    </FormField>
+                    <FormField label="Relationship" htmlFor="relationship">
+                      <Select name="relationship">
+                        <SelectTrigger id="relationship">
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="self">Self</SelectItem>
+                          <SelectItem value="spouse">Spouse</SelectItem>
+                          <SelectItem value="child">Child</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormField>
+                    <FormField label="Effective start" htmlFor="effective_start">
+                      <Input id="effective_start" name="effective_start" type="date" />
+                    </FormField>
+                    <FormField label="Effective end" htmlFor="effective_end">
+                      <Input id="effective_end" name="effective_end" type="date" />
+                    </FormField>
+                  </div>
+                  <Button type="submit">Add coverage</Button>
+                </form>
+              )
+            ) : null}
           </CardContent>
         </Card>
       </div>
