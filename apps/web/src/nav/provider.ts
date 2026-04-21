@@ -19,7 +19,7 @@ export const providerNav: readonly NavSection[] = [
     label: "Work",
     items: [
       { id: "home", label: "Dashboard", href: "/", icon: LayoutDashboard },
-      { id: "inbox", label: "Inbox", href: "/inbox", icon: Inbox, badge: 3 },
+      { id: "inbox", label: "Inbox", href: "/inbox", icon: Inbox },
       { id: "tasks", label: "Tasks", href: "/tasks", icon: ClipboardList },
     ],
   },
