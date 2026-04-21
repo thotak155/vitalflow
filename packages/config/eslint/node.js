@@ -1,3 +1,5 @@
+import globals from "globals";
+
 import base from "./base.js";
 
 /** @type {import("eslint").Linter.Config[]} */
@@ -6,10 +8,10 @@ export default [
   {
     files: ["**/*.{ts,js}"],
     languageOptions: {
-      globals: { ...require("globals").node }
+      globals: { ...globals.node },
     },
     rules: {
-      "no-process-exit": "off"
-    }
-  }
+      "no-process-exit": "off",
+    },
+  },
 ];

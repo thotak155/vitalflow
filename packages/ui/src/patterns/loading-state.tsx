@@ -15,7 +15,7 @@ export const LoadingState = React.forwardRef<HTMLDivElement, LoadingStateProps>(
       aria-live="polite"
       aria-busy="true"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-lg px-6 py-12 text-center text-muted-foreground",
+        "text-muted-foreground flex flex-col items-center justify-center gap-3 rounded-lg px-6 py-12 text-center",
         className,
       )}
       {...props}
@@ -31,14 +31,14 @@ LoadingState.displayName = "LoadingState";
  * Block-level skeleton that mimics content shape. Prefer this over a spinner
  * when the layout's real estate is known ahead of time.
  */
-export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type SkeletonProps = React.HTMLAttributes<HTMLDivElement>;
 
 export const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
       aria-hidden
-      className={cn("animate-pulse rounded-md bg-muted", className)}
+      className={cn("bg-muted animate-pulse rounded-md", className)}
       {...props}
     />
   ),

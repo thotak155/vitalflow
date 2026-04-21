@@ -1,4 +1,4 @@
-import baseConfig from "@vitalflow/config/eslint/base.js";
+import baseConfig from "./packages/config/eslint/base.js";
 
 export default [
   ...baseConfig,
