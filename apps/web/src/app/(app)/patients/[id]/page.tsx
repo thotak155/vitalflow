@@ -65,6 +65,88 @@ type CoverageRow = {
 
 type PayerOption = { id: string; name: string };
 
+type AllergyRow = {
+  id: string;
+  type: string;
+  substance: string;
+  reaction: string | null;
+  severity: string | null;
+  onset_date: string | null;
+};
+
+type MedicationRow = {
+  id: string;
+  display_name: string;
+  dose: string | null;
+  route: string | null;
+  frequency: string | null;
+  status: string;
+  start_date: string | null;
+};
+
+type ProblemRow = {
+  id: string;
+  code: string;
+  description: string;
+  status: string;
+  onset_date: string | null;
+  resolved_date: string | null;
+};
+
+type VisitRow = {
+  id: string;
+  start_at: string;
+  status: string;
+  reason: string | null;
+  chief_complaint: string | null;
+  provider_id: string;
+  note_status: string | null;
+  note_id: string | null;
+};
+
+type BalanceRow = {
+  current_balance_minor: number;
+  aging_0_30_minor: number;
+  aging_31_60_minor: number;
+  aging_61_90_minor: number;
+  aging_over_90_minor: number;
+  currency: string;
+  last_payment_at: string | null;
+};
+
+function fmtMoney(minor: number, currency: string): string {
+  const sign = minor < 0 ? "-" : "";
+  const abs = Math.abs(minor);
+  const dollars = (abs / 100).toFixed(2);
+  return `${sign}${currency === "USD" ? "$" : `${currency} `}${dollars}`;
+}
+
+const SEVERITY_VARIANTS: Record<string, "muted" | "warning" | "destructive"> = {
+  mild: "muted",
+  moderate: "warning",
+  severe: "destructive",
+  life_threatening: "destructive",
+};
+
+const MED_STATUS_VARIANTS: Record<string, "success" | "warning" | "muted"> = {
+  active: "success",
+  on_hold: "warning",
+  completed: "muted",
+  stopped: "muted",
+  draft: "muted",
+};
+
+const ENCOUNTER_STATUS_VARIANTS: Record<
+  string,
+  "muted" | "success" | "warning" | "destructive" | "default"
+> = {
+  planned: "default",
+  arrived: "warning",
+  in_progress: "warning",
+  finished: "success",
+  cancelled: "destructive",
+};
+
 const CONTACT_TYPES = [
   { value: "phone_mobile", label: "Mobile phone" },
   { value: "phone_home", label: "Home phone" },
@@ -360,6 +442,121 @@ export default async function PatientDetailPage({
     .eq("active", true)
     .order("name", { ascending: true });
   const payers = (payersRaw ?? []) as unknown as PayerOption[];
+
+  // --- Clinical summary fetches (run in parallel) ---------------------------
+  const [allergiesResp, medsResp, problemsResp, diagnosesResp, visitsResp, balanceResp] =
+    await Promise.all([
+      supabase
+        .from("allergies")
+        .select("id, type, substance, reaction, severity, onset_date")
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("medications")
+        .select("id, display_name, dose, route, frequency, status, start_date")
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .is("deleted_at", null)
+        .in("status", ["active", "on_hold"])
+        .order("start_date", { ascending: false }),
+      supabase
+        .from("problems")
+        .select("id, code, description, status, onset_date, resolved_date")
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .is("deleted_at", null)
+        .order("onset_date", { ascending: false, nullsFirst: false }),
+      supabase
+        .from("diagnosis_assignments")
+        .select("id, code, description, rank, assigned_at, encounter_id, removed_at")
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .is("removed_at", null)
+        .order("assigned_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("encounters")
+        .select("id, start_at, status, reason, chief_complaint, provider_id")
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .is("deleted_at", null)
+        .order("start_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("patient_balances")
+        .select(
+          "current_balance_minor, aging_0_30_minor, aging_31_60_minor, aging_61_90_minor, aging_over_90_minor, currency, last_payment_at",
+        )
+        .eq("patient_id", id)
+        .eq("tenant_id", session.tenantId)
+        .maybeSingle(),
+    ]);
+  const allergies = (allergiesResp.data as AllergyRow[] | null) ?? [];
+  const medications = (medsResp.data as MedicationRow[] | null) ?? [];
+  const problems = (problemsResp.data as ProblemRow[] | null) ?? [];
+  type DiagnosisAssignmentRow = {
+    id: string;
+    code: string;
+    description: string;
+    rank: number | null;
+    assigned_at: string;
+    encounter_id: string;
+  };
+  const diagnosisRows = (diagnosesResp.data as DiagnosisAssignmentRow[] | null) ?? [];
+  type EncounterMini = {
+    id: string;
+    start_at: string;
+    status: string;
+    reason: string | null;
+    chief_complaint: string | null;
+    provider_id: string;
+  };
+  const visitsRaw = (visitsResp.data as EncounterMini[] | null) ?? [];
+  const balance = balanceResp.data as BalanceRow | null;
+
+  // Fetch note status per visit + provider display names (follow-up queries)
+  const visitIds = visitsRaw.map((v) => v.id);
+  const providerIds = Array.from(new Set(visitsRaw.map((v) => v.provider_id).filter(Boolean)));
+  const [notesResp, providersResp] = await Promise.all([
+    visitIds.length > 0
+      ? supabase
+          .from("encounter_notes")
+          .select("id, encounter_id, status")
+          .in("encounter_id", visitIds)
+          .eq("tenant_id", session.tenantId)
+          .neq("status", "amended")
+      : Promise.resolve({
+          data: null as null | { id: string; encounter_id: string; status: string }[],
+        }),
+    providerIds.length > 0
+      ? supabase.from("profiles").select("id, full_name, email").in("id", providerIds)
+      : Promise.resolve({
+          data: null as null | { id: string; full_name: string | null; email: string }[],
+        }),
+  ]);
+  const notesByEnc = new Map<string, { id: string; status: string }>();
+  for (const n of notesResp.data ?? []) {
+    notesByEnc.set(n.encounter_id, { id: n.id, status: n.status });
+  }
+  const providerMap = new Map<string, string>();
+  for (const p of providersResp.data ?? []) {
+    providerMap.set(p.id, p.full_name ?? p.email);
+  }
+  const visits: (VisitRow & { providerName: string | null })[] = visitsRaw.map((v) => ({
+    ...v,
+    note_id: notesByEnc.get(v.id)?.id ?? null,
+    note_status: notesByEnc.get(v.id)?.status ?? null,
+    providerName: providerMap.get(v.provider_id) ?? null,
+  }));
+
+  // Deduplicate diagnoses by code for a compact problem-list view.
+  const dxByCode = new Map<string, DiagnosisAssignmentRow>();
+  for (const d of diagnosisRows) {
+    if (!dxByCode.has(d.code)) dxByCode.set(d.code, d);
+  }
+  const uniqueDx = Array.from(dxByCode.values());
 
   const displayName = patient.preferred_name
     ? `${patient.preferred_name} (${patient.given_name}) ${patient.family_name}`
@@ -699,7 +896,302 @@ export default async function PatientDetailPage({
             ) : null}
           </CardContent>
         </Card>
+
+        {/* -------- Clinical summary strip -------- */}
+        <div className="grid gap-3 md:grid-cols-4">
+          <SummaryTile
+            label="Active problems"
+            value={uniqueDx.length + problems.filter((p) => p.status === "active").length}
+            accent={
+              allergies.some((a) => a.severity === "life_threatening") ? "destructive" : "default"
+            }
+          />
+          <SummaryTile label="Allergies" value={allergies.length} />
+          <SummaryTile
+            label="Active medications"
+            value={medications.filter((m) => m.status === "active").length}
+          />
+          <SummaryTile
+            label="Balance"
+            value={balance ? fmtMoney(balance.current_balance_minor, balance.currency) : "—"}
+          />
+        </div>
+
+        {/* -------- Allergies -------- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Allergies ({allergies.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allergies.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No known allergies.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {allergies.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-start justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{a.substance}</span>
+                        <Badge variant="muted">{a.type}</Badge>
+                        {a.severity ? (
+                          <Badge variant={SEVERITY_VARIANTS[a.severity] ?? "muted"}>
+                            {a.severity.replace(/_/g, " ")}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {a.reaction ? (
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          Reaction: {a.reaction}
+                        </p>
+                      ) : null}
+                    </div>
+                    {a.onset_date ? (
+                      <span className="text-muted-foreground text-xs">Onset {a.onset_date}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* -------- Medications -------- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Medications ({medications.filter((m) => m.status === "active").length} active
+              {medications.filter((m) => m.status === "on_hold").length > 0
+                ? ` · ${medications.filter((m) => m.status === "on_hold").length} on hold`
+                : ""}
+              )
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {medications.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No active medications.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {medications.map((m) => (
+                  <li key={m.id} className="flex items-start justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{m.display_name}</span>
+                        <Badge variant={MED_STATUS_VARIANTS[m.status] ?? "muted"}>
+                          {m.status.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        {[m.dose, m.route, m.frequency].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+                    {m.start_date ? (
+                      <span className="text-muted-foreground text-xs">Since {m.start_date}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* -------- Problem list (diagnoses + problems) -------- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Problem list ({uniqueDx.length + problems.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {uniqueDx.length === 0 && problems.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No active problems or diagnoses on file.
+              </p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {problems.map((p) => (
+                  <li key={`p-${p.id}`} className="flex items-start justify-between gap-2 py-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{p.code}</span>
+                        <span className="font-medium">{p.description}</span>
+                        <Badge
+                          variant={
+                            p.status === "active"
+                              ? "warning"
+                              : p.status === "resolved"
+                                ? "success"
+                                : "muted"
+                          }
+                        >
+                          {p.status}
+                        </Badge>
+                      </div>
+                      {p.onset_date || p.resolved_date ? (
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {p.onset_date ? `Onset ${p.onset_date}` : ""}
+                          {p.resolved_date ? ` · Resolved ${p.resolved_date}` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+                {uniqueDx.map((d) => (
+                  <li key={`d-${d.id}`} className="flex items-start justify-between gap-2 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs">{d.code}</span>
+                      <span className="font-medium">{d.description}</span>
+                      <Badge variant="muted">Encounter-assigned</Badge>
+                    </div>
+                    <NextLink
+                      href={`/encounters/${d.encounter_id}`}
+                      className="text-xs text-sky-700 hover:underline"
+                    >
+                      View visit →
+                    </NextLink>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* -------- Visits -------- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent visits ({visits.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {visits.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No visits yet.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {visits.map((v) => {
+                  const subject = v.chief_complaint ?? v.reason ?? "—";
+                  return (
+                    <li
+                      key={v.id}
+                      className="flex flex-wrap items-start justify-between gap-2 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <NextLink
+                            href={`/encounters/${v.id}`}
+                            className="font-medium text-sky-700 hover:underline"
+                          >
+                            {new Date(v.start_at).toLocaleString()}
+                          </NextLink>
+                          <Badge variant={ENCOUNTER_STATUS_VARIANTS[v.status] ?? "default"}>
+                            {v.status.replace(/_/g, " ")}
+                          </Badge>
+                          {v.note_status ? (
+                            <Badge
+                              variant={
+                                v.note_status === "signed"
+                                  ? "success"
+                                  : v.note_status === "draft"
+                                    ? "warning"
+                                    : "muted"
+                              }
+                            >
+                              Note: {v.note_status.replace(/_/g, " ")}
+                            </Badge>
+                          ) : v.status === "finished" ? (
+                            <Badge variant="destructive">Note missing</Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-muted-foreground mt-0.5 text-xs">{subject}</p>
+                      </div>
+                      <div className="text-muted-foreground text-right text-xs">
+                        {v.providerName ?? "—"}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* -------- Balance / aging -------- */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {balance ? (
+              <>
+                <div className="mb-3 flex items-baseline gap-3">
+                  <span className="text-3xl font-semibold">
+                    {fmtMoney(balance.current_balance_minor, balance.currency)}
+                  </span>
+                  <span className="text-muted-foreground text-sm">current balance</span>
+                </div>
+                <dl className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+                  <AgingCell
+                    label="0–30"
+                    minor={balance.aging_0_30_minor}
+                    currency={balance.currency}
+                  />
+                  <AgingCell
+                    label="31–60"
+                    minor={balance.aging_31_60_minor}
+                    currency={balance.currency}
+                  />
+                  <AgingCell
+                    label="61–90"
+                    minor={balance.aging_61_90_minor}
+                    currency={balance.currency}
+                  />
+                  <AgingCell
+                    label="90+"
+                    minor={balance.aging_over_90_minor}
+                    currency={balance.currency}
+                  />
+                </dl>
+                {balance.last_payment_at ? (
+                  <p className="text-muted-foreground mt-3 text-xs">
+                    Last payment received {new Date(balance.last_payment_at).toLocaleString()}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">No balance record yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  accent = "default",
+}: {
+  label: string;
+  value: number | string;
+  accent?: "default" | "destructive";
+}) {
+  return (
+    <Card className={accent === "destructive" ? "border-destructive/40" : undefined}>
+      <CardContent className="p-4">
+        <p className="text-muted-foreground text-xs uppercase tracking-wide">{label}</p>
+        <p
+          className={`mt-1 text-2xl font-semibold ${
+            accent === "destructive" ? "text-destructive" : ""
+          }`}
+        >
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgingCell({ label, minor, currency }: { label: string; minor: number; currency: string }) {
+  return (
+    <div className="rounded border border-slate-200 p-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 font-medium">{fmtMoney(minor, currency)}</dd>
+    </div>
   );
 }

@@ -909,8 +909,8 @@ export default async function EncounterWorkspacePage({
     .from("encounters")
     .select(
       "id, patient_id, provider_id, status, start_at, end_at, reason, chief_complaint, " +
-        "patient:patient_id(given_name, family_name, mrn, date_of_birth), " +
-        "provider:provider_id(full_name, email)",
+        "patient:patients!encounters_patient_id_fkey(given_name, family_name, mrn, date_of_birth), " +
+        "provider:profiles!encounters_provider_profile_fkey(full_name, email)",
     )
     .eq("id", id)
     .eq("tenant_id", session.tenantId)
@@ -944,7 +944,7 @@ export default async function EncounterWorkspacePage({
     .from("encounter_notes")
     .select(
       "id, version, status, author_id, signed_at, signed_by, amended_from, updated_at, " +
-        "author:author_id(full_name, email)",
+        "author:profiles!encounter_notes_author_profile_fkey(full_name, email)",
     )
     .eq("encounter_id", id)
     .eq("tenant_id", session.tenantId)

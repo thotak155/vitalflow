@@ -147,7 +147,7 @@ export default async function NewAppointmentPage({
 
   const { data: providersRaw } = await supabase
     .from("tenant_members")
-    .select("user_id, profiles:user_id(full_name, email)")
+    .select("user_id, profiles:profiles!tenant_members_user_profile_fkey(full_name, email)")
     .eq("tenant_id", session.tenantId)
     .eq("status", "active")
     .is("deleted_at", null);

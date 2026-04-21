@@ -71,8 +71,7 @@ export default async function EncountersListPage({
     .from("encounters")
     .select(
       "id, patient_id, provider_id, status, start_at, end_at, reason, chief_complaint, " +
-        "patient:patient_id(given_name, family_name, mrn), " +
-        "provider:provider_id(full_name, email)",
+        "patient:patients!encounters_patient_id_fkey(given_name, family_name, mrn)",
     )
     .eq("tenant_id", session.tenantId)
     .is("deleted_at", null)
@@ -87,7 +86,26 @@ export default async function EncountersListPage({
   }
 
   const { data: rowsRaw, error } = await q;
-  const rows = (rowsRaw ?? []) as unknown as EncounterRow[];
+  const baseRows = (rowsRaw ?? []) as unknown as Omit<EncounterRow, "provider">[];
+
+  // Provider display fields live on public.profiles; fetch those separately
+  // and merge in to avoid cross-FK disambiguation in PostgREST.
+  const providerIds = Array.from(new Set(baseRows.map((r) => r.provider_id).filter(Boolean)));
+  const providerMap = new Map<string, { full_name: string | null; email: string }>();
+  if (providerIds.length > 0) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", providerIds);
+    type ProfileRow = { id: string; full_name: string | null; email: string };
+    for (const p of (profs as ProfileRow[] | null) ?? []) {
+      providerMap.set(p.id, { full_name: p.full_name, email: p.email });
+    }
+  }
+  const rows: EncounterRow[] = baseRows.map((r) => ({
+    ...r,
+    provider: providerMap.get(r.provider_id) ?? null,
+  }));
 
   return (
     <>

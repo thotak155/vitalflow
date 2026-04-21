@@ -1,5 +1,16 @@
 {
   "permissions": {
-    "allow": ["Bash(pnpm dev *)", "Bash(pnpm typecheck *)"]
+    "allow": [
+      "Bash(pnpm dev *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm lint *)",
+      "Bash(echo \"lint=$?\")",
+      "Bash(echo \"typecheck=$?\")",
+      "Bash(pnpm format:check)",
+      "Bash(echo \"format=$?\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
+    ]
   }
 }

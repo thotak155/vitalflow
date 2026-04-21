@@ -298,9 +298,9 @@ export default async function AppointmentDetailPage({
     .from("appointments")
     .select(
       "id, patient_id, provider_id, location_id, encounter_id, start_at, end_at, status, reason, visit_type, telehealth_url, cancelled_at, cancelled_reason, " +
-        "patient:patient_id(id, given_name, family_name, mrn), " +
-        "provider:provider_id(full_name, email), " +
-        "location:location_id(name)",
+        "patient:patients!appointments_patient_id_fkey(id, given_name, family_name, mrn), " +
+        "provider:profiles!appointments_provider_profile_fkey(full_name, email), " +
+        "location:locations!appointments_location_id_fkey(name)",
     )
     .eq("id", id)
     .eq("tenant_id", session.tenantId)

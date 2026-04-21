@@ -209,7 +209,9 @@ export default async function MembersPage({
   const supabase = await createVitalFlowServerClient();
   const { data: membersRaw, error } = await supabase
     .from("tenant_members")
-    .select("id, user_id, roles, status, joined_at, deleted_at, profiles:user_id(email, full_name)")
+    .select(
+      "id, user_id, roles, status, joined_at, deleted_at, profiles:profiles!tenant_members_user_profile_fkey(email, full_name)",
+    )
     .eq("tenant_id", session.tenantId)
     .is("deleted_at", null)
     .order("joined_at", { ascending: true });

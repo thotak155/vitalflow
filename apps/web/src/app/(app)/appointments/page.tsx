@@ -128,8 +128,8 @@ export default async function AppointmentsListPage({
     .from("appointments")
     .select(
       "id, patient_id, provider_id, start_at, end_at, status, reason, visit_type, " +
-        "patient:patient_id(given_name, family_name, mrn), " +
-        "provider:provider_id(full_name, email)",
+        "patient:patients!appointments_patient_id_fkey(given_name, family_name, mrn), " +
+        "provider:profiles!appointments_provider_profile_fkey(full_name, email)",
     )
     .eq("tenant_id", session.tenantId)
     .gte("start_at", rangeStart.toISOString())
