@@ -92,6 +92,12 @@ function greetingFor(date: Date): string {
 function firstNameFrom(displayName: string): string {
   const trimmed = displayName.trim();
   if (!trimmed) return "there";
+  // Profiles whose full_name defaults to the email address — show the local
+  // part, capitalised, instead of the whole "name@domain.com" string.
+  if (trimmed.includes("@") && !trimmed.includes(" ")) {
+    const local = trimmed.split("@")[0] ?? "there";
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
   const parts = trimmed.split(/\s+/);
   if (parts[0]?.match(/^(Dr\.?|Mr\.?|Mrs\.?|Ms\.?)$/i) && parts.length > 1) {
     return `${parts[0]} ${parts[parts.length - 1]}`;
