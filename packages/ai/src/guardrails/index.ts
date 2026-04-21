@@ -21,7 +21,10 @@ const CARD = /\b(?:\d[ -]?){13,19}\b/g;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 export function redactPhiFromText(input: string): string {
-  return input.replace(SSN, "[REDACTED_SSN]").replace(CARD, "[REDACTED_CARD]").replace(EMAIL, "[REDACTED_EMAIL]");
+  return input
+    .replace(SSN, "[REDACTED_SSN]")
+    .replace(CARD, "[REDACTED_CARD]")
+    .replace(EMAIL, "[REDACTED_EMAIL]");
 }
 
 export { redactPhi };

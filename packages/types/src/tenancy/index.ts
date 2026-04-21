@@ -61,6 +61,7 @@ export const PermissionSchema = z.enum([
   "billing:collect",
   "billing:adjust",
   "billing:write_off",
+  "charges:capture",
   // Admin
   "admin:tenant",
   "admin:users",
@@ -83,7 +84,11 @@ export type Permission = z.infer<typeof PermissionSchema>;
 
 export const TenantSchema = z.object({
   id: TenantIdSchema,
-  slug: z.string().min(2).max(64).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(2)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/),
   displayName: z.string().min(1).max(128),
   plan: z.enum(["starter", "growth", "enterprise"]),
   region: z.enum(["us-east-1", "us-west-2", "eu-west-1", "ap-south-1"]),

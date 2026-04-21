@@ -31,7 +31,7 @@ export const AppBreadcrumbs = React.forwardRef<HTMLElement, AppBreadcrumbsProps>
     <nav
       ref={ref}
       aria-label="Breadcrumb"
-      className={cn("flex min-w-0 items-center text-sm text-muted-foreground", className)}
+      className={cn("text-muted-foreground flex min-w-0 items-center text-sm", className)}
       {...props}
     >
       <ol className="flex min-w-0 items-center gap-1.5">
@@ -40,19 +40,22 @@ export const AppBreadcrumbs = React.forwardRef<HTMLElement, AppBreadcrumbsProps>
           return (
             <li key={`${item.label}-${idx}`} className="flex min-w-0 items-center gap-1.5">
               {idx > 0 ? (
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+                <ChevronRight
+                  className="text-muted-foreground/60 h-3.5 w-3.5 shrink-0"
+                  aria-hidden
+                />
               ) : null}
               {isLast || !item.href ? (
                 <span
                   aria-current={isLast ? "page" : undefined}
-                  className={cn("truncate", isLast && "font-medium text-foreground")}
+                  className={cn("truncate", isLast && "text-foreground font-medium")}
                 >
                   {item.label}
                 </span>
               ) : (
                 <LinkComponent
                   href={item.href}
-                  className="truncate hover:text-foreground focus:outline-none focus:underline"
+                  className="hover:text-foreground truncate focus:underline focus:outline-none"
                 >
                   {item.label}
                 </LinkComponent>

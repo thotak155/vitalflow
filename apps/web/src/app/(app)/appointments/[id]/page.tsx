@@ -1,8 +1,5 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Badge,
   Button,
@@ -49,16 +46,17 @@ type AppointmentRow = {
   location: { name: string } | null;
 };
 
-const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> = {
-  scheduled: "default",
-  confirmed: "success",
-  arrived: "warning",
-  in_progress: "warning",
-  completed: "success",
-  cancelled: "destructive",
-  no_show: "destructive",
-  rescheduled: "muted",
-};
+const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> =
+  {
+    scheduled: "default",
+    confirmed: "success",
+    arrived: "warning",
+    in_progress: "warning",
+    completed: "success",
+    cancelled: "destructive",
+    no_show: "destructive",
+    rescheduled: "muted",
+  };
 
 const NEXT_STATUS: Record<string, { label: string; next: string }[]> = {
   scheduled: [
@@ -80,7 +78,10 @@ const NEXT_STATUS: Record<string, { label: string; next: string }[]> = {
 
 type WritableApptsTable = {
   update: (v: Record<string, unknown>) => {
-    eq: (c: string, v: string) => {
+    eq: (
+      c: string,
+      v: string,
+    ) => {
       eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -113,7 +114,9 @@ async function setStatus(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/appointments/${id}`);
-  redirect(`/appointments/${id}?ok=${encodeURIComponent(`Status set to ${next.replace(/_/g, " ")}`)}`);
+  redirect(
+    `/appointments/${id}?ok=${encodeURIComponent(`Status set to ${next.replace(/_/g, " ")}`)}`,
+  );
 }
 
 async function cancelAppointment(formData: FormData): Promise<void> {
@@ -184,15 +187,20 @@ async function openEncounter(formData: FormData): Promise<void> {
   }
 
   // Create encounter in-progress, link back from the appointment.
-  const encInsert = await (supabase as unknown as {
-    from: (t: string) => {
-      insert: (v: Record<string, unknown>) => {
-        select: (s: string) => {
-          single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+  const encInsert = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => {
+          select: (s: string) => {
+            single: () => Promise<{
+              data: { id: string } | null;
+              error: { message: string } | null;
+            }>;
+          };
         };
       };
-    };
-  })
+    }
+  )
     .from("encounters")
     .insert({
       tenant_id: session.tenantId,
@@ -304,9 +312,7 @@ export default async function AppointmentDetailPage({
   }
 
   const startDate = new Date(appt.start_at);
-  const durationMin = Math.round(
-    (new Date(appt.end_at).getTime() - startDate.getTime()) / 60000,
-  );
+  const durationMin = Math.round((new Date(appt.end_at).getTime() - startDate.getTime()) / 60000);
   const canWrite = session.permissions.includes("schedule:write");
   const transitions = NEXT_STATUS[appt.status] ?? [];
   const isActive = !["cancelled", "no_show", "completed"].includes(appt.status);
@@ -318,18 +324,19 @@ export default async function AppointmentDetailPage({
         items={[
           { label: "Home", href: "/" },
           { label: "Appointments", href: "/appointments" },
-          { label: `${appt.patient?.given_name ?? ""} ${appt.patient?.family_name ?? ""}`.trim() || id },
+          {
+            label:
+              `${appt.patient?.given_name ?? ""} ${appt.patient?.family_name ?? ""}`.trim() || id,
+          },
         ]}
       />
       <PageHeader
         eyebrow="Appointment"
         title={
-          appt.patient
-            ? `${appt.patient.given_name} ${appt.patient.family_name}`
-            : "Appointment"
+          appt.patient ? `${appt.patient.given_name} ${appt.patient.family_name}` : "Appointment"
         }
         description={
-          <span className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-3 text-sm">
             <span>{startDate.toLocaleString()}</span>
             <span>·</span>
             <span>{durationMin} min</span>
@@ -352,9 +359,7 @@ export default async function AppointmentDetailPage({
               <Button asChild>
                 <NextLink href={`/encounters/${appt.encounter_id}`}>Open encounter</NextLink>
               </Button>
-            ) : canWrite &&
-              session.permissions.includes("clinical:write") &&
-              isActive ? (
+            ) : canWrite && session.permissions.includes("clinical:write") && isActive ? (
               <form action={openEncounter}>
                 <input type="hidden" name="id" value={appt.id} />
                 <Button type="submit">Open encounter</Button>
@@ -372,18 +377,18 @@ export default async function AppointmentDetailPage({
       {sp.ok ? (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          className="border-success/30 bg-success/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+          <CheckCircle2 className="text-success mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.ok}</span>
         </div>
       ) : null}
       {sp.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.error}</span>
         </div>
       ) : null}
@@ -492,7 +497,7 @@ export default async function AppointmentDetailPage({
               <CardTitle>Cancelled</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {appt.cancelled_at ? new Date(appt.cancelled_at).toLocaleString() : ""} —{" "}
                 {appt.cancelled_reason}
               </p>
@@ -533,12 +538,15 @@ export default async function AppointmentDetailPage({
             {appt.encounter_id ? (
               <p className="text-sm">
                 Encounter linked.{" "}
-                <NextLink href={`/encounters/${appt.encounter_id}`} className="text-primary hover:underline">
+                <NextLink
+                  href={`/encounters/${appt.encounter_id}`}
+                  className="text-primary hover:underline"
+                >
                   Open encounter →
                 </NextLink>
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 No encounter yet. Click <strong>Open encounter</strong> above to start the visit and
                 open the clinical workspace.
               </p>

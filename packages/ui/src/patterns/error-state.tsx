@@ -13,31 +13,34 @@ export interface ErrorStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
 }
 
 export const ErrorState = React.forwardRef<HTMLDivElement, ErrorStateProps>(
-  ({ className, icon: Icon = AlertTriangle, title, description, action, technical, ...props }, ref) => (
+  (
+    { className, icon: Icon = AlertTriangle, title, description, action, technical, ...props },
+    ref,
+  ) => (
     <div
       ref={ref}
       role="alert"
       aria-live="assertive"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-12 text-center",
+        "border-destructive/30 bg-destructive/5 flex flex-col items-center justify-center gap-3 rounded-lg border px-6 py-12 text-center",
         className,
       )}
       {...props}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+      <div className="bg-destructive/10 text-destructive flex h-12 w-12 items-center justify-center rounded-full">
         <Icon className="h-6 w-6" aria-hidden />
       </div>
       <div className="space-y-1">
-        <div className="text-base font-medium text-foreground">{title}</div>
+        <div className="text-foreground text-base font-medium">{title}</div>
         {description ? (
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground mx-auto max-w-sm text-sm">{description}</p>
         ) : null}
       </div>
       {action ? <div className="mt-2">{action}</div> : null}
       {technical ? (
-        <details className="mt-2 w-full max-w-sm text-left text-xs text-muted-foreground">
+        <details className="text-muted-foreground mt-2 w-full max-w-sm text-left text-xs">
           <summary className="cursor-pointer select-none">Technical details</summary>
-          <pre className="mt-2 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono">
+          <pre className="bg-muted mt-2 overflow-auto whitespace-pre-wrap break-all rounded p-2 font-mono">
             {technical}
           </pre>
         </details>

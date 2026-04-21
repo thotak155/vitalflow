@@ -15,11 +15,11 @@ module.exports = {
   overrides: [
     {
       files: "*.md",
-      options: { proseWrap: "always" }
+      options: { proseWrap: "always" },
     },
     {
       files: ["*.yml", "*.yaml"],
-      options: { singleQuote: false }
-    }
-  ]
+      options: { singleQuote: false },
+    },
+  ],
 };

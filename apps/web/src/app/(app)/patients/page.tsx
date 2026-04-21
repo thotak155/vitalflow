@@ -74,9 +74,12 @@ export default async function PatientsListPage({
   const supabase = await createVitalFlowServerClient();
   let query = supabase
     .from("patients")
-    .select("id, mrn, given_name, family_name, preferred_name, date_of_birth, sex_at_birth, deceased_at", {
-      count: "exact",
-    })
+    .select(
+      "id, mrn, given_name, family_name, preferred_name, date_of_birth, sex_at_birth, deceased_at",
+      {
+        count: "exact",
+      },
+    )
     .eq("tenant_id", session.tenantId)
     .is("deleted_at", null)
     .order("family_name", { ascending: true })
@@ -114,7 +117,13 @@ export default async function PatientsListPage({
       <form method="get" className="mb-4 flex gap-2">
         <div className="flex-1">
           <FormField label="Search" htmlFor="q" helper="By name, preferred name, or MRN.">
-            <Input id="q" name="q" type="search" defaultValue={q} placeholder="Smith, Alex, MRN-1001…" />
+            <Input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Smith, Alex, MRN-1001…"
+            />
           </FormField>
         </div>
         <div className="flex items-end">
@@ -132,7 +141,7 @@ export default async function PatientsListPage({
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="text-sm text-destructive">Failed to load: {error.message}</p>
+            <p className="text-destructive text-sm">Failed to load: {error.message}</p>
           ) : rows.length === 0 ? (
             <EmptyState
               title={q ? "No matches" : "No patients yet"}
@@ -161,10 +170,9 @@ export default async function PatientsListPage({
                 </TableHeader>
                 <TableBody>
                   {rows.map((p) => {
-                    const displayName =
-                      p.preferred_name
-                        ? `${p.preferred_name} (${p.given_name}) ${p.family_name}`
-                        : `${p.given_name} ${p.family_name}`;
+                    const displayName = p.preferred_name
+                      ? `${p.preferred_name} (${p.given_name}) ${p.family_name}`
+                      : `${p.given_name} ${p.family_name}`;
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-mono text-xs">
@@ -173,7 +181,10 @@ export default async function PatientsListPage({
                           </NextLink>
                         </TableCell>
                         <TableCell>
-                          <NextLink href={`/patients/${p.id}`} className="font-medium hover:underline">
+                          <NextLink
+                            href={`/patients/${p.id}`}
+                            className="font-medium hover:underline"
+                          >
                             {displayName}
                           </NextLink>
                         </TableCell>

@@ -15,13 +15,13 @@ export default [
       parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
-        ecmaFeatures: { jsx: true }
+        ecmaFeatures: { jsx: true },
       },
-      globals: { ...globals.node, ...globals.browser, ...globals.es2022 }
+      globals: { ...globals.node, ...globals.browser, ...globals.es2022 },
     },
     plugins: {
       "@typescript-eslint": tseslint,
-      import: importPlugin
+      import: importPlugin,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
@@ -29,11 +29,11 @@ export default [
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/consistent-type-imports": [
         "error",
-        { prefer: "type-imports", fixStyle: "inline-type-imports" }
+        { prefer: "type-imports", fixStyle: "inline-type-imports" },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
@@ -42,13 +42,13 @@ export default [
         {
           groups: ["builtin", "external", "internal", "parent", "sibling", "index", "type"],
           "newlines-between": "always",
-          alphabetize: { order: "asc", caseInsensitive: true }
-        }
+          alphabetize: { order: "asc", caseInsensitive: true },
+        },
       ],
       "import/no-default-export": "off",
       eqeqeq: ["error", "always", { null: "ignore" }],
-      curly: ["error", "all"]
-    }
+      curly: ["error", "all"],
+    },
   },
-  prettier
+  prettier,
 ];

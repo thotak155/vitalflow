@@ -99,7 +99,11 @@ export default function AdminOverviewPage() {
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Internal notes" htmlFor="notes" helper="Not visible to tenant users.">
+              <FormField
+                label="Internal notes"
+                htmlFor="notes"
+                helper="Not visible to tenant users."
+              >
                 <Textarea
                   id="notes"
                   value={notes}
@@ -117,7 +121,7 @@ export default function AdminOverviewPage() {
               <CardTitle>Billing</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Stripe integration surfaces here once the monetization service is wired up.
               </p>
             </CardContent>
@@ -130,7 +134,7 @@ export default function AdminOverviewPage() {
               <CardTitle>Compliance</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 BAA signature, audit log retention, and data-residency controls live here.
               </p>
             </CardContent>

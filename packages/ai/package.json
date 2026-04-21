@@ -12,7 +12,10 @@
     "./guardrails": "./src/guardrails/index.ts",
     "./prompts": "./src/prompts/index.ts"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

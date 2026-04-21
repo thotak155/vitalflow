@@ -1,10 +1,4 @@
-import {
-  CreditCard,
-  LayoutDashboard,
-  Settings,
-  Shield,
-  Users,
-} from "@vitalflow/ui/icons";
+import { CreditCard, LayoutDashboard, Settings, Shield, Users } from "@vitalflow/ui/icons";
 import type { NavSection } from "@vitalflow/ui/layout";
 
 export const adminNav: readonly NavSection[] = [

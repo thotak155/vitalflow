@@ -10,7 +10,7 @@ export default [
     plugins: { "@next/next": nextPlugin },
     rules: {
       ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules
-    }
-  }
+      ...nextPlugin.configs["core-web-vitals"].rules,
+    },
+  },
 ];

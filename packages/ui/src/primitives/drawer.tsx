@@ -19,7 +19,7 @@ const DrawerOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm",
+      "bg-foreground/50 fixed inset-0 z-50 backdrop-blur-sm",
       "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
       className,
     )}
@@ -29,14 +29,16 @@ const DrawerOverlay = React.forwardRef<
 DrawerOverlay.displayName = "DrawerOverlay";
 
 const drawerVariants = cva(
-  "fixed z-50 flex flex-col gap-4 bg-background shadow-vf-lg transition ease-vf",
+  "bg-background shadow-vf-lg ease-vf fixed z-50 flex flex-col gap-4 transition",
   {
     variants: {
       side: {
-        left: "inset-y-0 left-0 h-full w-3/4 border-r border-border data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0 sm:max-w-md",
-        right: "inset-y-0 right-0 h-full w-3/4 border-l border-border data-[state=closed]:translate-x-full data-[state=open]:translate-x-0 sm:max-w-md",
-        top: "inset-x-0 top-0 border-b border-border data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0",
-        bottom: "inset-x-0 bottom-0 border-t border-border data-[state=closed]:translate-y-full data-[state=open]:translate-y-0",
+        left: "border-border inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:-translate-x-full data-[state=open]:translate-x-0 sm:max-w-md",
+        right:
+          "border-border inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:translate-x-full data-[state=open]:translate-x-0 sm:max-w-md",
+        top: "border-border inset-x-0 top-0 border-b data-[state=closed]:-translate-y-full data-[state=open]:translate-y-0",
+        bottom:
+          "border-border inset-x-0 bottom-0 border-t data-[state=closed]:translate-y-full data-[state=open]:translate-y-0",
       },
     },
     defaultVariants: { side: "right" },
@@ -44,7 +46,8 @@ const drawerVariants = cva(
 );
 
 export interface DrawerContentProps
-  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
+  extends
+    React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof drawerVariants> {
   hideClose?: boolean;
 }
@@ -64,8 +67,8 @@ export const DrawerContent = React.forwardRef<
       {!hideClose ? (
         <DialogPrimitive.Close
           className={cn(
-            "absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity",
-            "hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            "ring-offset-background absolute right-4 top-4 rounded-sm opacity-70 transition-opacity",
+            "focus:ring-ring hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2",
           )}
         >
           <X className="h-4 w-4" aria-hidden />
@@ -83,7 +86,10 @@ export const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLD
 DrawerHeader.displayName = "DrawerHeader";
 
 export const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("mt-auto flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />
+  <div
+    className={cn("mt-auto flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+    {...props}
+  />
 );
 DrawerFooter.displayName = "DrawerFooter";
 
@@ -105,7 +111,7 @@ export const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-muted-foreground text-sm", className)}
     {...props}
   />
 ));

@@ -12,7 +12,10 @@
     "./server": "./src/server.ts",
     "./events": "./src/events.ts"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

@@ -192,10 +192,7 @@ export interface DiagnosisService {
     input: DiagnosisReorder,
   ): Promise<DiagnosisAssignment[]>;
   /** Optional: promote an encounter diagnosis to the patient problem list. */
-  promoteToProblem(
-    ctx: ServiceContext,
-    id: DiagnosisAssignmentId,
-  ): Promise<{ problemId: string }>;
+  promoteToProblem(ctx: ServiceContext, id: DiagnosisAssignmentId): Promise<{ problemId: string }>;
 }
 
 // ---------- ClinicalDocument -------------------------------------------------

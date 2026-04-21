@@ -14,10 +14,7 @@ export const AIScribeTranscriptSegmentIdSchema = z
   .brand<"AIScribeTranscriptSegmentId">();
 export type AIScribeTranscriptSegmentId = z.infer<typeof AIScribeTranscriptSegmentIdSchema>;
 
-export const AIScribeCodeSuggestionIdSchema = z
-  .string()
-  .uuid()
-  .brand<"AIScribeCodeSuggestionId">();
+export const AIScribeCodeSuggestionIdSchema = z.string().uuid().brand<"AIScribeCodeSuggestionId">();
 export type AIScribeCodeSuggestionId = z.infer<typeof AIScribeCodeSuggestionIdSchema>;
 
 // ---------- Enums ------------------------------------------------------------
@@ -46,6 +43,9 @@ export type AIStepStatus = z.infer<typeof AIStepStatusSchema>;
 
 export const AICodeTypeSchema = z.enum(["diagnosis", "procedure"]);
 export type AICodeType = z.infer<typeof AICodeTypeSchema>;
+
+export const AICodeSourceSchema = z.enum(["transcript", "soap_only", "patient_context"]);
+export type AICodeSource = z.infer<typeof AICodeSourceSchema>;
 
 // ---------- Confidence --------------------------------------------------------
 
@@ -77,7 +77,7 @@ export type AIScribeTranscriptSegment = z.infer<typeof AIScribeTranscriptSegment
 export const SoapSectionSchema = z.object({
   text: z.string(),
   segmentIds: z.array(AIScribeTranscriptSegmentIdSchema).default([]),
-  confidence: z.number().min(0).max(1),
+  confidence: ConfidenceSchema,
 });
 export type SoapSection = z.infer<typeof SoapSectionSchema>;
 
@@ -101,7 +101,10 @@ export const AIScribeCodeSuggestionSchema = z.object({
   codeSystem: z.enum(["icd10-cm", "cpt"]),
   code: z.string().min(1).max(32),
   description: z.string().min(1).max(512),
-  confidence: z.number().min(0).max(1),
+  rationale: z.string().min(1).max(800),
+  missingDocumentation: z.array(z.string().min(1).max(300)).max(8).default([]),
+  source: AICodeSourceSchema,
+  confidence: ConfidenceSchema,
   rank: z.number().int().min(1),
   segmentIds: z.array(AIScribeTranscriptSegmentIdSchema).default([]),
   acceptedAt: z.string().datetime().nullable().optional(),

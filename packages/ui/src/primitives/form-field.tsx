@@ -31,7 +31,7 @@ export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
           <Label htmlFor={htmlFor}>
             {label}
             {required ? (
-              <span aria-hidden className="ml-0.5 text-destructive">
+              <span aria-hidden className="text-destructive ml-0.5">
                 *
               </span>
             ) : null}
@@ -39,11 +39,11 @@ export const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
         ) : null}
         {children}
         {error ? (
-          <p id={errorId} role="alert" className="text-xs text-destructive">
+          <p id={errorId} role="alert" className="text-destructive text-xs">
             {error}
           </p>
         ) : helper ? (
-          <p id={helperId} className="text-xs text-muted-foreground">
+          <p id={helperId} className="text-muted-foreground text-xs">
             {helper}
           </p>
         ) : null}

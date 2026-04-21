@@ -14,7 +14,8 @@
 
 1. Go to <https://github.com/new>.
 2. Name: `vitalflow` (or your org's convention).
-3. Privacy: **Private**. This repo contains healthcare domain code; keep it private even before PHI is involved.
+3. Privacy: **Private**. This repo contains healthcare domain code; keep it private even before PHI
+   is involved.
 4. **Do not** initialize with README/.gitignore/license — the repo already has them.
 5. Click **Create repository**.
 6. Copy the `git remote add origin …` command GitHub shows you — you'll use it in step 3.
@@ -29,7 +30,8 @@ gh repo create vitalflow --private --source=. --remote=origin --push
 
 ## 2. Verify the local repo is clean
 
-The local repo has already been initialized with a first commit covering the full scaffold. Before pushing, confirm nothing sensitive snuck in:
+The local repo has already been initialized with a first commit covering the full scaffold. Before
+pushing, confirm nothing sensitive snuck in:
 
 ```bash
 # No .env.local or secrets staged
@@ -62,22 +64,28 @@ git push -u origin develop
 
 1. Go to <https://vercel.com/new>.
 2. Select **Import Git Repository** and pick `vitalflow`.
-3. **Root Directory:** set to `apps/web` (click "Edit" next to the path). Vercel auto-detects Next.js and pnpm.
+3. **Root Directory:** set to `apps/web` (click "Edit" next to the path). Vercel auto-detects
+   Next.js and pnpm.
 4. **Framework Preset:** Next.js (auto-detected).
-5. **Build / Install commands:** **do not override** — the [`apps/web/vercel.json`](../apps/web/vercel.json) pins them to the monorepo-aware versions.
-6. **Environment Variables:** at minimum, add these (copy values from your Supabase dashboard → Project Settings → API):
+5. **Build / Install commands:** **do not override** — the
+   [`apps/web/vercel.json`](../apps/web/vercel.json) pins them to the monorepo-aware versions.
+6. **Environment Variables:** at minimum, add these (copy values from your Supabase dashboard →
+   Project Settings → API):
 
-   | Name                               | Value                                                 |
-   | ---------------------------------- | ----------------------------------------------------- |
-   | `NEXT_PUBLIC_SUPABASE_URL`         | `https://agxumcgutolrenlgxnta.supabase.co`            |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | (anon key)                                            |
-   | `SUPABASE_SERVICE_ROLE_KEY`        | (service role secret — mark as **sensitive**)         |
-   | `SUPABASE_JWT_SECRET`              | (JWT secret — **sensitive**)                          |
-   | `AUTH_SECRET`                      | `openssl rand -base64 32` per environment             |
-   | `NEXT_PUBLIC_APP_URL`              | `https://<vercel-production-domain>` (fill in after first deploy) |
-   | `VITALFLOW_ENV`                    | `production` (or `staging`, `preview`)                |
+   | Name                            | Value                                                             |
+   | ------------------------------- | ----------------------------------------------------------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | `https://agxumcgutolrenlgxnta.supabase.co`                        |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | (anon key)                                                        |
+   | `SUPABASE_SERVICE_ROLE_KEY`     | (service role secret — mark as **sensitive**)                     |
+   | `SUPABASE_JWT_SECRET`           | (JWT secret — **sensitive**)                                      |
+   | `AUTH_SECRET`                   | `openssl rand -base64 32` per environment                         |
+   | `NEXT_PUBLIC_APP_URL`           | `https://<vercel-production-domain>` (fill in after first deploy) |
+   | `VITALFLOW_ENV`                 | `production` (or `staging`, `preview`)                            |
 
-   Scope each variable to **Production**, **Preview**, and/or **Development** as appropriate. See [`.env.production.example`](../.env.production.example) and [`.env.staging.example`](../.env.staging.example) for the full list to mirror across environments.
+   Scope each variable to **Production**, **Preview**, and/or **Development** as appropriate. See
+   [`.env.production.example`](../.env.production.example) and
+   [`.env.staging.example`](../.env.staging.example) for the full list to mirror across
+   environments.
 
 7. Click **Deploy**. The first build takes ~4 min.
 
@@ -99,7 +107,9 @@ Without this, magic-link sign-in will reject the callback.
 
 ## 6. (Optional) Wire up the CI/CD pipeline we already built
 
-The repo ships with complete GitHub Actions workflows at [.github/workflows/](../.github/workflows/). They'll run on push — but they need secrets before they can deploy.
+The repo ships with complete GitHub Actions workflows at
+[.github/workflows/](../.github/workflows/). They'll run on push — but they need secrets before they
+can deploy.
 
 ### Secrets to add at GitHub → Settings → Secrets and variables → Actions
 
@@ -131,11 +141,11 @@ SUPABASE_PROJECT_REF_PROD        # after you create prod project
 
 ### Environments to create at GitHub → Settings → Environments
 
-| Environment          | Required reviewers                        |
-| -------------------- | ----------------------------------------- |
-| `staging`            | (none — auto-deploys from `develop`)      |
-| `production`         | At least 1 reviewer from your ops team    |
-| `production-readonly`| (none — used by the weekly advisor scan)  |
+| Environment           | Required reviewers                       |
+| --------------------- | ---------------------------------------- |
+| `staging`             | (none — auto-deploys from `develop`)     |
+| `production`          | At least 1 reviewer from your ops team   |
+| `production-readonly` | (none — used by the weekly advisor scan) |
 
 ### Branch protection rules
 
@@ -148,14 +158,16 @@ gh api repos/$REPO/rulesets --method POST --input .github/rulesets/main.json
 gh api repos/$REPO/rulesets --method POST --input .github/rulesets/develop.json
 ```
 
-These enforce CODEOWNERS review, required status checks, linear history, and signed commits on `main`.
+These enforce CODEOWNERS review, required status checks, linear history, and signed commits on
+`main`.
 
 ## 7. Verify end-to-end
 
 1. Visit your Vercel production URL — you should be redirected to `/login`.
 2. Enter an email address that matches a `auth.users` row in Supabase.
 3. Click the magic link → land on `/` (the provider dashboard).
-4. Open a PR — verify a preview deploy URL is posted to the PR by the [preview workflow](../.github/workflows/preview.yml).
+4. Open a PR — verify a preview deploy URL is posted to the PR by the
+   [preview workflow](../.github/workflows/preview.yml).
 
 If login fails or the preview doesn't post, skip to [Troubleshooting](#troubleshooting).
 
@@ -171,24 +183,34 @@ You currently have one Supabase project (`MedPro-VitalFlow`). For real staging/p
    supabase db push --linked
    ```
 
-3. Update the GitHub variables `SUPABASE_PROJECT_REF_STAGING` / `SUPABASE_PROJECT_REF_PROD` with the new refs.
-4. Update Vercel's **Preview** environment variables to point at staging, **Production** at prod. Each tier gets its own Supabase URL + anon key + service-role secret.
+3. Update the GitHub variables `SUPABASE_PROJECT_REF_STAGING` / `SUPABASE_PROJECT_REF_PROD` with the
+   new refs.
+4. Update Vercel's **Preview** environment variables to point at staging, **Production** at prod.
+   Each tier gets its own Supabase URL + anon key + service-role secret.
 5. Rotate all secrets so prod keys are never used in staging.
 
-See [`docs/devops-strategy.md` §1](devops-strategy.md#1-environment-naming-convention) for the full environment matrix.
+See [`docs/devops-strategy.md` §1](devops-strategy.md#1-environment-naming-convention) for the full
+environment matrix.
 
 ## Troubleshooting
 
-**"nothing to commit, working tree clean" on first `git push`** — you haven't committed yet. Run `git status` to see untracked files; the initial commit should have captured everything.
+**"nothing to commit, working tree clean" on first `git push`** — you haven't committed yet. Run
+`git status` to see untracked files; the initial commit should have captured everything.
 
-**`.env.local` appears in `git ls-files`** — it shouldn't. Run `git rm --cached .env.local` and recommit. Verify `.gitignore` contains `.env.local`.
+**`.env.local` appears in `git ls-files`** — it shouldn't. Run `git rm --cached .env.local` and
+recommit. Verify `.gitignore` contains `.env.local`.
 
-**Vercel build fails with `Cannot find module '@vitalflow/ui'`** — Root Directory isn't `apps/web`, or `vercel.json` was overridden in the Vercel UI. Reset both.
+**Vercel build fails with `Cannot find module '@vitalflow/ui'`** — Root Directory isn't `apps/web`,
+or `vercel.json` was overridden in the Vercel UI. Reset both.
 
-**Magic link redirects to 401** — Supabase URL Configuration doesn't list `https://<your-domain>/auth/callback`. Add it.
+**Magic link redirects to 401** — Supabase URL Configuration doesn't list
+`https://<your-domain>/auth/callback`. Add it.
 
-**Preview deploys work but auth fails on preview** — add `https://*-<your-vercel-team>.vercel.app/auth/callback` as a wildcard redirect in Supabase.
+**Preview deploys work but auth fails on preview** — add
+`https://*-<your-vercel-team>.vercel.app/auth/callback` as a wildcard redirect in Supabase.
 
-**CI workflows fail with "secret not found"** — a required secret is missing. Check which job failed and cross-reference the list in §6.
+**CI workflows fail with "secret not found"** — a required secret is missing. Check which job failed
+and cross-reference the list in §6.
 
-**`.env.example` files appear in gitleaks alerts** — the [gitleaks.toml](../.github/gitleaks.toml) allowlist already covers them; if you see false positives, check your fork of the config.
+**`.env.example` files appear in gitleaks alerts** — the [gitleaks.toml](../.github/gitleaks.toml)
+allowlist already covers them; if you see false positives, check your fork of the config.

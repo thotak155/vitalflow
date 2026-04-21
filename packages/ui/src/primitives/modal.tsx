@@ -18,7 +18,7 @@ export const ModalOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm",
+      "bg-foreground/50 fixed inset-0 z-50 backdrop-blur-sm",
       "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
       className,
     )}
@@ -39,7 +39,7 @@ export const ModalContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2",
-        "rounded-lg border border-border bg-background p-6 shadow-vf-lg",
+        "border-border bg-background shadow-vf-lg rounded-lg border p-6",
         "data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
         "focus:outline-none",
         className,
@@ -50,8 +50,8 @@ export const ModalContent = React.forwardRef<
       {!hideClose ? (
         <DialogPrimitive.Close
           className={cn(
-            "absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity",
-            "hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            "ring-offset-background absolute right-4 top-4 rounded-sm opacity-70 transition-opacity",
+            "focus:ring-ring hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2",
             "disabled:pointer-events-none",
           )}
         >
@@ -65,10 +65,7 @@ export const ModalContent = React.forwardRef<
 ModalContent.displayName = DialogPrimitive.Content.displayName;
 
 export const ModalHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}
-    {...props}
-  />
+  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
 );
 ModalHeader.displayName = "ModalHeader";
 
@@ -98,7 +95,7 @@ export const ModalDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-muted-foreground text-sm", className)}
     {...props}
   />
 ));

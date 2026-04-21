@@ -20,20 +20,30 @@ export function ImpersonationBanner({
   return (
     <div
       role="alert"
-      className="sticky top-0 z-50 flex items-center justify-center gap-3 border-b border-warning bg-warning px-4 py-2 text-sm font-medium text-warning-foreground"
+      className="border-warning bg-warning text-warning-foreground sticky top-0 z-50 flex items-center justify-center gap-3 border-b px-4 py-2 text-sm font-medium"
     >
       <AlertTriangle className="h-4 w-4" aria-hidden />
       <span>
         IMPERSONATING
-        {targetName ? <> <strong>{targetName}</strong></> : null}
-        {impersonatorName ? <> as <strong>{impersonatorName}</strong></> : null}
+        {targetName ? (
+          <>
+            {" "}
+            <strong>{targetName}</strong>
+          </>
+        ) : null}
+        {impersonatorName ? (
+          <>
+            {" "}
+            as <strong>{impersonatorName}</strong>
+          </>
+        ) : null}
         {" · "}
         session ends in {remaining} min
       </span>
       <form action="/api/impersonation/end" method="post" className="ml-2">
         <button
           type="submit"
-          className="rounded-sm border border-warning-foreground/20 bg-warning-foreground/10 px-2 py-0.5 text-xs hover:bg-warning-foreground/20"
+          className="border-warning-foreground/20 bg-warning-foreground/10 hover:bg-warning-foreground/20 rounded-sm border px-2 py-0.5 text-xs"
         >
           End session
         </button>

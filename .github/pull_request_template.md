@@ -7,8 +7,8 @@
 - [ ] apps/provider-app
 - [ ] apps/admin-app
 - [ ] apps/patient-portal
-- [ ] packages/*
-- [ ] services/*
+- [ ] packages/\*
+- [ ] services/\*
 - [ ] supabase (schema / RLS / functions)
 
 ## Compliance checklist

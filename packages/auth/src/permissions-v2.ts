@@ -468,10 +468,7 @@ export function hasPermissionV2(ctx: TenantContext, perm: PermissionV2Key): bool
   return (ctx.permissions as readonly string[]).includes(perm);
 }
 
-export function hasAnyPermissionV2(
-  ctx: TenantContext,
-  perms: readonly PermissionV2Key[],
-): boolean {
+export function hasAnyPermissionV2(ctx: TenantContext, perms: readonly PermissionV2Key[]): boolean {
   return perms.some((p) => hasPermissionV2(ctx, p));
 }
 

@@ -46,8 +46,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: pnpm version       # runs `changeset version` via package.json script
-          publish: pnpm release       # runs `changeset publish` (tags only; no npm publish here)
+          version: pnpm version # runs `changeset version` via package.json script
+          publish: pnpm release # runs `changeset publish` (tags only; no npm publish here)
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:

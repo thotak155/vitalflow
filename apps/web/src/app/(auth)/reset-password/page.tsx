@@ -1,13 +1,5 @@
 import { createVitalFlowServerClient } from "@vitalflow/auth/server";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  FormField,
-  Input,
-} from "@vitalflow/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, FormField, Input } from "@vitalflow/ui";
 import { AlertCircle, HeartPulse } from "@vitalflow/ui/icons";
 import { redirect } from "next/navigation";
 
@@ -21,7 +13,9 @@ async function updatePassword(formData: FormData): Promise<void> {
   const confirm = String(formData.get("confirm") ?? "");
 
   if (password.length < 12) {
-    redirect(`/reset-password?error=${encodeURIComponent("Password must be at least 12 characters")}`);
+    redirect(
+      `/reset-password?error=${encodeURIComponent("Password must be at least 12 characters")}`,
+    );
   }
   if (password !== confirm) {
     redirect(`/reset-password?error=${encodeURIComponent("Passwords don't match")}`);
@@ -54,12 +48,12 @@ export default async function ResetPasswordPage({
   return (
     <Card className="shadow-vf-md">
       <CardHeader className="items-center text-center">
-        <div className="flex items-center gap-2 text-primary">
+        <div className="text-primary flex items-center gap-2">
           <HeartPulse className="h-6 w-6" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">VitalFlow</span>
         </div>
         <CardTitle>Choose a new password</CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           At least 12 characters. Use something you don&apos;t use elsewhere.
         </p>
       </CardHeader>
@@ -67,9 +61,9 @@ export default async function ResetPasswordPage({
         {error ? (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground"
+            className="border-destructive/30 bg-destructive/5 text-foreground flex items-start gap-2 rounded-md border p-3 text-sm"
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+            <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>{error}</span>
           </div>
         ) : null}

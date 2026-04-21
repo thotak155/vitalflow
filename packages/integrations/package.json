@@ -14,7 +14,10 @@
     "./twilio": "./src/twilio/index.ts",
     "./resend": "./src/resend/index.ts"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

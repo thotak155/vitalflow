@@ -12,7 +12,10 @@ import type { SupabaseServerClient } from "./server.js";
  * inference boundary. Rather than pollute call sites, centralize the cast
  * here — the SQL functions are authoritative (see migrations 0014, 0015).
  */
-type RpcFn = (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+type RpcFn = (
+  fn: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { message: string } | null }>;
 function rpc(client: SupabaseServerClient): RpcFn {
   return (fn, args) => (client as unknown as { rpc: RpcFn }).rpc(fn, args);
 }

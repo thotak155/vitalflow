@@ -45,7 +45,11 @@ export const ClinicalDocumentSchema = z.object({
   storagePath: z.string().min(1).max(512),
   mimeType: z.string().min(1).max(128),
   sizeBytes: z.number().int().nonnegative(),
-  sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(),
+  sha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable()
+    .optional(),
   label: z.string().max(256).nullable().optional(),
   category: z.string().max(64).nullable().optional(),
   // NEW columns — see migration follow-up
@@ -64,13 +68,20 @@ export const ClinicalDocumentUploadSchema = z.object({
   patientId: PatientIdSchema.optional(),
   encounterId: EncounterIdSchema.optional(),
   mimeType: z.string().min(1).max(128),
-  sizeBytes: z.number().int().nonnegative().max(128 * 1024 * 1024), // 128 MB cap
+  sizeBytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(128 * 1024 * 1024), // 128 MB cap
   kind: DocumentKindSchema.default("other"),
   source: DocumentSourceSchema.default("upload"),
   label: z.string().max(256).optional(),
   category: z.string().max(64).optional(),
   effectiveDate: z.string().date().optional(),
-  sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sha256: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
 });
 export type ClinicalDocumentUpload = z.infer<typeof ClinicalDocumentUploadSchema>;
 

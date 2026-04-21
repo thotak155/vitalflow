@@ -1,12 +1,7 @@
 "use client";
 
 import { HeartPulse, Shield, UserRound } from "@vitalflow/ui/icons";
-import {
-  Sidebar,
-  SidebarLayout,
-  TopNav,
-  type NavContext,
-} from "@vitalflow/ui/layout";
+import { Sidebar, SidebarLayout, TopNav, type NavContext } from "@vitalflow/ui/layout";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -28,12 +23,7 @@ const SURFACE_ICONS = {
   patient: UserRound,
 } as const;
 
-export function AppShell({
-  availableSurfaces,
-  permissions,
-  user,
-  children,
-}: AppShellProps) {
+export function AppShell({ availableSurfaces, permissions, user, children }: AppShellProps) {
   const pathname = usePathname() ?? "/";
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -50,10 +40,10 @@ export function AppShell({
         <Sidebar
           brand={
             <span className="flex items-center gap-2 font-semibold">
-              <BrandIcon className="h-5 w-5 text-primary" aria-hidden />
+              <BrandIcon className="text-primary h-5 w-5" aria-hidden />
               VitalFlow
               {activeSurface !== "provider" ? (
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-muted-foreground text-xs font-normal">
                   · {SURFACE_LABELS[activeSurface]}
                 </span>
               ) : null}

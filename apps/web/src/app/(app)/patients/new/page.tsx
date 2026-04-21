@@ -1,8 +1,5 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Button,
   Card,
@@ -32,9 +29,7 @@ interface NewPatientSearchParams {
 }
 
 type WritablePatientsTable = {
-  insert: (
-    v: Record<string, unknown>,
-  ) => {
+  insert: (v: Record<string, unknown>) => {
     select: (s: string) => {
       single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
     };
@@ -133,9 +128,9 @@ export default async function NewPatientPage({
       {params.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground"
+          className="border-destructive/30 bg-destructive/5 text-foreground mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{params.error}</span>
         </div>
       ) : null}
@@ -151,7 +146,13 @@ export default async function NewPatientPage({
                 <Input id="given_name" name="given_name" type="text" required autoComplete="off" />
               </FormField>
               <FormField label="Last name" htmlFor="family_name" required>
-                <Input id="family_name" name="family_name" type="text" required autoComplete="off" />
+                <Input
+                  id="family_name"
+                  name="family_name"
+                  type="text"
+                  required
+                  autoComplete="off"
+                />
               </FormField>
               <FormField
                 label="Preferred name"
@@ -185,11 +186,7 @@ export default async function NewPatientPage({
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField
-                label="MRN"
-                htmlFor="mrn"
-                helper="Leave blank to auto-generate."
-              >
+              <FormField label="MRN" htmlFor="mrn" helper="Leave blank to auto-generate.">
                 <Input id="mrn" name="mrn" type="text" autoComplete="off" placeholder="MRN-…" />
               </FormField>
             </div>

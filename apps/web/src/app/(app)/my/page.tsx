@@ -43,7 +43,7 @@ export default function PatientHomePage() {
                   A scheduler will confirm your time by email within one business day.
                 </ModalDescription>
               </ModalHeader>
-              <p className="py-4 text-sm text-muted-foreground">
+              <p className="text-muted-foreground py-4 text-sm">
                 Full booking flow lands with the scheduling milestone.
               </p>
               <ModalFooter>
@@ -59,7 +59,7 @@ export default function PatientHomePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <Calendar className="text-muted-foreground h-4 w-4" aria-hidden />
               Upcoming visits
             </CardTitle>
           </CardHeader>
@@ -80,7 +80,7 @@ export default function PatientHomePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <Mail className="text-muted-foreground h-4 w-4" aria-hidden />
               Messages
               <Badge variant="muted" size="sm">
                 0

@@ -3,10 +3,7 @@ import { createHash } from "node:crypto";
 import { createVitalFlowAdminClient } from "@vitalflow/auth/admin";
 import { logEventBestEffort } from "@vitalflow/auth/audit";
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Badge,
   Button,
@@ -32,6 +29,8 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { getSession } from "../../../../lib/session.js";
+import { AIReviewCard } from "./ai-review/AIReviewCard.js";
+import { ChargeCaptureCard } from "./charge-capture/ChargeCaptureCard.js";
 
 export const dynamic = "force-dynamic";
 
@@ -138,15 +137,19 @@ type VitalsRow = {
   notes: string | null;
 };
 
-const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> = {
-  planned: "default",
-  arrived: "warning",
-  in_progress: "warning",
-  finished: "success",
-  cancelled: "destructive",
-};
+const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> =
+  {
+    planned: "default",
+    arrived: "warning",
+    in_progress: "warning",
+    finished: "success",
+    cancelled: "destructive",
+  };
 
-const NOTE_STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> = {
+const NOTE_STATUS_VARIANTS: Record<
+  string,
+  "muted" | "success" | "warning" | "destructive" | "default"
+> = {
   draft: "warning",
   pending_review: "warning",
   signed: "success",
@@ -157,11 +160,17 @@ const NOTE_STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "de
 type WritableTable<TSel extends string = "id"> = {
   insert: (v: Record<string, unknown>) => {
     select: (s: string) => {
-      single: () => Promise<{ data: Record<TSel, string> | null; error: { message: string } | null }>;
+      single: () => Promise<{
+        data: Record<TSel, string> | null;
+        error: { message: string } | null;
+      }>;
     };
   };
   update: (v: Record<string, unknown>) => {
-    eq: (c: string, v: string) => {
+    eq: (
+      c: string,
+      v: string,
+    ) => {
       eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -250,7 +259,9 @@ async function saveNoteDraft(formData: FormData): Promise<void> {
   const plan = String(formData.get("plan") ?? "");
 
   if (!encounterId || !patientId) {
-    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Missing encounter or patient")}`);
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent("Missing encounter or patient")}`,
+    );
   }
 
   const supabase = await createVitalFlowServerClient();
@@ -319,12 +330,22 @@ async function signNote(formData: FormData): Promise<void> {
     .eq("id", noteId)
     .eq("tenant_id", session.tenantId)
     .maybeSingle();
-  const note = noteRaw as { id: string; version: number; subjective: string | null; objective: string | null; assessment: string | null; plan: string | null; status: string } | null;
+  const note = noteRaw as {
+    id: string;
+    version: number;
+    subjective: string | null;
+    objective: string | null;
+    assessment: string | null;
+    plan: string | null;
+    status: string;
+  } | null;
   if (!note) {
     redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Note not found")}`);
   }
   if (note.status === "signed") {
-    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Note already signed — use amend to modify")}`);
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent("Note already signed — use amend to modify")}`,
+    );
   }
 
   const signedAt = new Date().toISOString();
@@ -356,7 +377,9 @@ async function signNote(formData: FormData): Promise<void> {
     .select("id")
     .single();
   if (sigErr) {
-    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(`Signature failed: ${sigErr.message}`)}`);
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(`Signature failed: ${sigErr.message}`)}`,
+    );
   }
 
   const { error: noteErr } = await tbl(supabase, "encounter_notes")
@@ -368,7 +391,9 @@ async function signNote(formData: FormData): Promise<void> {
     .eq("id", note.id)
     .eq("tenant_id", session.tenantId);
   if (noteErr) {
-    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(`Sign failed: ${noteErr.message}`)}`);
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent(`Sign failed: ${noteErr.message}`)}`,
+    );
   }
 
   revalidatePath(`/encounters/${encounterId}`);
@@ -383,7 +408,9 @@ async function assignDiagnosis(formData: FormData): Promise<void> {
 
   const encounterId = String(formData.get("encounter_id") ?? "");
   const patientId = String(formData.get("patient_id") ?? "");
-  const code = String(formData.get("code") ?? "").trim().toUpperCase();
+  const code = String(formData.get("code") ?? "")
+    .trim()
+    .toUpperCase();
   const description = String(formData.get("description") ?? "").trim();
 
   if (!encounterId || !patientId || !code || !description) {
@@ -421,11 +448,13 @@ async function assignDiagnosis(formData: FormData): Promise<void> {
     );
   }
 
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-    };
-  })
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
     .from("diagnosis_assignments")
     .insert({
       tenant_id: session.tenantId,
@@ -442,7 +471,9 @@ async function assignDiagnosis(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/encounters/${encounterId}`);
-  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent(`Added ${code} at rank ${nextRank}`)}`);
+  redirect(
+    `/encounters/${encounterId}?ok=${encodeURIComponent(`Added ${code} at rank ${nextRank}`)}`,
+  );
 }
 
 async function removeDiagnosis(formData: FormData): Promise<void> {
@@ -458,15 +489,20 @@ async function removeDiagnosis(formData: FormData): Promise<void> {
   }
 
   const supabase = await createVitalFlowServerClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      update: (v: Record<string, unknown>) => {
-        eq: (c: string, v: string) => {
-          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        update: (v: Record<string, unknown>) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
+            eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+          };
         };
       };
-    };
-  })
+    }
+  )
     .from("diagnosis_assignments")
     .update({ removed_at: new Date().toISOString() })
     .eq("id", id)
@@ -500,11 +536,13 @@ async function addAllergy(formData: FormData): Promise<void> {
   }
 
   const supabase = await createVitalFlowServerClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-    };
-  })
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
     .from("allergies")
     .insert({
       tenant_id: session.tenantId,
@@ -537,15 +575,20 @@ async function removeAllergy(formData: FormData): Promise<void> {
   }
 
   const supabase = await createVitalFlowServerClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      update: (v: Record<string, unknown>) => {
-        eq: (c: string, v: string) => {
-          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        update: (v: Record<string, unknown>) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
+            eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+          };
         };
       };
-    };
-  })
+    }
+  )
     .from("allergies")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
@@ -580,11 +623,13 @@ async function addMedication(formData: FormData): Promise<void> {
   }
 
   const supabase = await createVitalFlowServerClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-    };
-  })
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
     .from("medications")
     .insert({
       tenant_id: session.tenantId,
@@ -625,15 +670,20 @@ async function setMedicationStatus(formData: FormData): Promise<void> {
   if (next === "completed" || next === "stopped") {
     payload.end_date = new Date().toISOString().slice(0, 10);
   }
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => {
-      update: (v: Record<string, unknown>) => {
-        eq: (c: string, v: string) => {
-          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        update: (v: Record<string, unknown>) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
+            eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+          };
         };
       };
-    };
-  })
+    }
+  )
     .from("medications")
     .update(payload)
     .eq("id", id)
@@ -810,7 +860,8 @@ async function recordVitals(formData: FormData): Promise<void> {
   };
 
   const allEmpty = Object.entries(payload).every(
-    ([k, v]) => ["tenant_id", "patient_id", "encounter_id", "recorded_by"].includes(k) || v === null,
+    ([k, v]) =>
+      ["tenant_id", "patient_id", "encounter_id", "recorded_by"].includes(k) || v === null,
   );
   if (allEmpty) {
     redirect(
@@ -819,9 +870,13 @@ async function recordVitals(formData: FormData): Promise<void> {
   }
 
   const supabase = await createVitalFlowServerClient();
-  const { error } = await (supabase as unknown as {
-    from: (t: string) => { insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }> };
-  })
+  const { error } = await (
+    supabase as unknown as {
+      from: (t: string) => {
+        insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      };
+    }
+  )
     .from("vitals")
     .insert(payload);
   if (error) {
@@ -837,7 +892,7 @@ export default async function EncounterWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; error?: string; showLow?: string }>;
 }) {
   const session = await getSession();
   if (!session) {
@@ -946,7 +1001,9 @@ export default async function EncounterWorkspacePage({
 
   const { data: documentsRaw } = await supabase
     .from("attachments")
-    .select("id, label, kind, source, mime_type, size_bytes, signed_by, signed_at, effective_date, created_at, uploaded_by")
+    .select(
+      "id, label, kind, source, mime_type, size_bytes, signed_by, signed_at, effective_date, created_at, uploaded_by",
+    )
     .eq("encounter_id", id)
     .eq("tenant_id", session.tenantId)
     .is("deleted_at", null)
@@ -969,29 +1026,40 @@ export default async function EncounterWorkspacePage({
 
     if (noteIds.length > 0) {
       const admin = createVitalFlowAdminClient();
-      const { data: eventsRaw } = await (admin as unknown as {
-        schema: (s: string) => {
-          from: (t: string) => {
-            select: (cols: string) => {
-              eq: (c: string, v: string) => {
-                eq: (c: string, v: string) => {
-                  in: (c: string, v: readonly string[]) => {
-                    order: (
+      const { data: eventsRaw } = await (
+        admin as unknown as {
+          schema: (s: string) => {
+            from: (t: string) => {
+              select: (cols: string) => {
+                eq: (
+                  c: string,
+                  v: string,
+                ) => {
+                  eq: (
+                    c: string,
+                    v: string,
+                  ) => {
+                    in: (
                       c: string,
-                      opts: { ascending: boolean },
+                      v: readonly string[],
                     ) => {
-                      limit: (n: number) => Promise<{
-                        data: AuditEventRow[] | null;
-                        error: { message: string } | null;
-                      }>;
+                      order: (
+                        c: string,
+                        opts: { ascending: boolean },
+                      ) => {
+                        limit: (n: number) => Promise<{
+                          data: AuditEventRow[] | null;
+                          error: { message: string } | null;
+                        }>;
+                      };
                     };
                   };
                 };
               };
             };
           };
-        };
-      })
+        }
+      )
         .schema("audit")
         .from("audit_events")
         .select("id, occurred_at, actor_id, action, event_type, row_id, details")
@@ -1030,13 +1098,14 @@ export default async function EncounterWorkspacePage({
         eyebrow="Encounter"
         title={displayName}
         description={
-          <span className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
             {encounter.patient ? (
               <>
                 <span className="font-mono">{encounter.patient.mrn}</span>
                 <span>·</span>
                 <span>
-                  DOB {encounter.patient.date_of_birth} ({calcAge(encounter.patient.date_of_birth)} y)
+                  DOB {encounter.patient.date_of_birth} ({calcAge(encounter.patient.date_of_birth)}{" "}
+                  y)
                 </span>
                 <span>·</span>
               </>
@@ -1061,18 +1130,18 @@ export default async function EncounterWorkspacePage({
       {sp.ok ? (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          className="border-success/30 bg-success/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+          <CheckCircle2 className="text-success mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.ok}</span>
         </div>
       ) : null}
       {sp.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.error}</span>
         </div>
       ) : null}
@@ -1101,7 +1170,7 @@ export default async function EncounterWorkspacePage({
                       id="status"
                       name="status"
                       defaultValue={encounter.status}
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                     >
                       <option value="planned">Planned</option>
                       <option value="arrived">Arrived</option>
@@ -1111,7 +1180,12 @@ export default async function EncounterWorkspacePage({
                   </FormField>
                 </div>
                 <FormField label="Reason" htmlFor="reason">
-                  <Textarea id="reason" name="reason" rows={2} defaultValue={encounter.reason ?? ""} />
+                  <Textarea
+                    id="reason"
+                    name="reason"
+                    rows={2}
+                    defaultValue={encounter.reason ?? ""}
+                  />
                 </FormField>
                 <Button type="submit">Save summary</Button>
               </form>
@@ -1159,10 +1233,10 @@ export default async function EncounterWorkspacePage({
                         ) : null}
                       </div>
                       {a.reaction ? (
-                        <div className="text-xs text-muted-foreground">Reaction: {a.reaction}</div>
+                        <div className="text-muted-foreground text-xs">Reaction: {a.reaction}</div>
                       ) : null}
                       {a.notes ? (
-                        <div className="text-xs text-muted-foreground">{a.notes}</div>
+                        <div className="text-muted-foreground text-xs">{a.notes}</div>
                       ) : null}
                     </div>
                     {canWrite && !encounterFinished ? (
@@ -1178,7 +1252,7 @@ export default async function EncounterWorkspacePage({
                 ))}
               </ul>
             ) : (
-              <p className="mb-4 text-sm text-muted-foreground">
+              <p className="text-muted-foreground mb-4 text-sm">
                 No known allergies on file. Record any reactions the patient reports below.
               </p>
             )}
@@ -1186,7 +1260,7 @@ export default async function EncounterWorkspacePage({
             {canWrite && !encounterFinished ? (
               <form
                 action={addAllergy}
-                className="space-y-3 rounded-md border border-dashed border-border p-4"
+                className="border-border space-y-3 rounded-md border border-dashed p-4"
               >
                 <input type="hidden" name="encounter_id" value={encounter.id} />
                 <input type="hidden" name="patient_id" value={encounter.patient_id} />
@@ -1197,7 +1271,7 @@ export default async function EncounterWorkspacePage({
                       name="type"
                       required
                       defaultValue="medication"
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                     >
                       <option value="medication">Medication</option>
                       <option value="food">Food</option>
@@ -1215,7 +1289,7 @@ export default async function EncounterWorkspacePage({
                     <select
                       id="severity"
                       name="severity"
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                     >
                       <option value="">—</option>
                       <option value="mild">Mild</option>
@@ -1260,7 +1334,7 @@ export default async function EncounterWorkspacePage({
                       <TableCell className="text-xs">
                         {[m.route, m.frequency].filter(Boolean).join(" · ") || "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-xs">
                         {m.start_date ?? "—"}
                         {m.end_date ? ` → ${m.end_date}` : ""}
                       </TableCell>
@@ -1313,13 +1387,13 @@ export default async function EncounterWorkspacePage({
                 </TableBody>
               </Table>
             ) : (
-              <p className="mb-4 text-sm text-muted-foreground">No medications on file.</p>
+              <p className="text-muted-foreground mb-4 text-sm">No medications on file.</p>
             )}
 
             {canWrite && !encounterFinished ? (
               <form
                 action={addMedication}
-                className="mt-4 space-y-3 rounded-md border border-dashed border-border p-4"
+                className="border-border mt-4 space-y-3 rounded-md border border-dashed p-4"
               >
                 <input type="hidden" name="encounter_id" value={encounter.id} />
                 <input type="hidden" name="patient_id" value={encounter.patient_id} />
@@ -1392,15 +1466,16 @@ export default async function EncounterWorkspacePage({
                 </TableBody>
               </Table>
             ) : (
-              <p className="mb-4 text-sm text-muted-foreground">
-                No diagnoses assigned. Add at least one before signing the note for claim generation.
+              <p className="text-muted-foreground mb-4 text-sm">
+                No diagnoses assigned. Add at least one before signing the note for claim
+                generation.
               </p>
             )}
 
             {canWrite && !encounterFinished ? (
               <form
                 action={assignDiagnosis}
-                className="mt-4 space-y-3 rounded-md border border-dashed border-border p-4"
+                className="border-border mt-4 space-y-3 rounded-md border border-dashed p-4"
               >
                 <input type="hidden" name="encounter_id" value={encounter.id} />
                 <input type="hidden" name="patient_id" value={encounter.patient_id} />
@@ -1428,9 +1503,9 @@ export default async function EncounterWorkspacePage({
                     <Button type="submit">Add</Button>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Rank is assigned automatically (next available). Full ICD-10 dictionary lookup ships
-                  with the billing surface — for now, type the code + description by hand.
+                <p className="text-muted-foreground text-xs">
+                  Rank is assigned automatically (next available). Full ICD-10 dictionary lookup
+                  ships with the billing surface — for now, type the code + description by hand.
                 </p>
               </form>
             ) : null}
@@ -1447,12 +1522,14 @@ export default async function EncounterWorkspacePage({
               <ul className="mb-4 divide-y text-sm">
                 {vitals.map((v) => (
                   <li key={v.id} className="py-2">
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-muted-foreground text-xs">
                       {new Date(v.recorded_at).toLocaleString()}
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {v.systolic_mmhg && v.diastolic_mmhg ? (
-                        <span>BP {v.systolic_mmhg}/{v.diastolic_mmhg}</span>
+                        <span>
+                          BP {v.systolic_mmhg}/{v.diastolic_mmhg}
+                        </span>
                       ) : null}
                       {v.heart_rate_bpm ? <span>HR {v.heart_rate_bpm}</span> : null}
                       {v.respiratory_rate ? <span>RR {v.respiratory_rate}</span> : null}
@@ -1462,7 +1539,9 @@ export default async function EncounterWorkspacePage({
                       {v.height_cm ? <span>Ht {v.height_cm}cm</span> : null}
                       {v.pain_score !== null ? <span>Pain {v.pain_score}/10</span> : null}
                     </div>
-                    {v.notes ? <div className="text-xs text-muted-foreground">{v.notes}</div> : null}
+                    {v.notes ? (
+                      <div className="text-muted-foreground text-xs">{v.notes}</div>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -1471,34 +1550,79 @@ export default async function EncounterWorkspacePage({
             {canRecordVitals && !encounterFinished ? (
               <form
                 action={recordVitals}
-                className="space-y-3 rounded-md border border-dashed border-border p-4"
+                className="border-border space-y-3 rounded-md border border-dashed p-4"
               >
                 <input type="hidden" name="encounter_id" value={encounter.id} />
                 <input type="hidden" name="patient_id" value={encounter.patient_id} />
                 <div className="grid gap-3 md:grid-cols-4">
                   <FormField label="Systolic" htmlFor="systolic_mmhg">
-                    <Input id="systolic_mmhg" name="systolic_mmhg" type="number" min={40} max={300} />
+                    <Input
+                      id="systolic_mmhg"
+                      name="systolic_mmhg"
+                      type="number"
+                      min={40}
+                      max={300}
+                    />
                   </FormField>
                   <FormField label="Diastolic" htmlFor="diastolic_mmhg">
-                    <Input id="diastolic_mmhg" name="diastolic_mmhg" type="number" min={20} max={200} />
+                    <Input
+                      id="diastolic_mmhg"
+                      name="diastolic_mmhg"
+                      type="number"
+                      min={20}
+                      max={200}
+                    />
                   </FormField>
                   <FormField label="HR" htmlFor="heart_rate_bpm">
-                    <Input id="heart_rate_bpm" name="heart_rate_bpm" type="number" min={20} max={300} />
+                    <Input
+                      id="heart_rate_bpm"
+                      name="heart_rate_bpm"
+                      type="number"
+                      min={20}
+                      max={300}
+                    />
                   </FormField>
                   <FormField label="RR" htmlFor="respiratory_rate">
-                    <Input id="respiratory_rate" name="respiratory_rate" type="number" min={5} max={60} />
+                    <Input
+                      id="respiratory_rate"
+                      name="respiratory_rate"
+                      type="number"
+                      min={5}
+                      max={60}
+                    />
                   </FormField>
                   <FormField label="Temp (°C)" htmlFor="temperature_c">
-                    <Input id="temperature_c" name="temperature_c" type="number" step="0.1" min={30} max={45} />
+                    <Input
+                      id="temperature_c"
+                      name="temperature_c"
+                      type="number"
+                      step="0.1"
+                      min={30}
+                      max={45}
+                    />
                   </FormField>
                   <FormField label="SpO₂ (%)" htmlFor="spo2_pct">
                     <Input id="spo2_pct" name="spo2_pct" type="number" min={50} max={100} />
                   </FormField>
                   <FormField label="Weight (kg)" htmlFor="weight_kg">
-                    <Input id="weight_kg" name="weight_kg" type="number" step="0.1" min={0.5} max={500} />
+                    <Input
+                      id="weight_kg"
+                      name="weight_kg"
+                      type="number"
+                      step="0.1"
+                      min={0.5}
+                      max={500}
+                    />
                   </FormField>
                   <FormField label="Height (cm)" htmlFor="height_cm">
-                    <Input id="height_cm" name="height_cm" type="number" step="0.1" min={20} max={250} />
+                    <Input
+                      id="height_cm"
+                      name="height_cm"
+                      type="number"
+                      step="0.1"
+                      min={20}
+                      max={250}
+                    />
                   </FormField>
                   <FormField label="Pain (0–10)" htmlFor="pain_score">
                     <Input id="pain_score" name="pain_score" type="number" min={0} max={10} />
@@ -1518,10 +1642,15 @@ export default async function EncounterWorkspacePage({
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>
-                Clinical note {note ? <Badge variant={NOTE_STATUS_VARIANTS[note.status] ?? "default"}>{note.status}</Badge> : null}
+                Clinical note{" "}
+                {note ? (
+                  <Badge variant={NOTE_STATUS_VARIANTS[note.status] ?? "default"}>
+                    {note.status}
+                  </Badge>
+                ) : null}
               </span>
               {note?.version ? (
-                <span className="text-xs text-muted-foreground">v{note.version}</span>
+                <span className="text-muted-foreground text-xs">v{note.version}</span>
               ) : null}
             </CardTitle>
           </CardHeader>
@@ -1529,14 +1658,14 @@ export default async function EncounterWorkspacePage({
             {noteSigned && note ? (
               <>
                 <div className="space-y-4 text-sm">
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Signed {note.signed_at ? new Date(note.signed_at).toLocaleString() : ""} — use
                     Amend below to create a new version.
                   </p>
                   {(["subjective", "objective", "assessment", "plan"] as const).map((k) => (
                     <div key={k}>
-                      <div className="text-xs font-medium uppercase text-muted-foreground">{k}</div>
-                      <div className="whitespace-pre-wrap rounded-md border border-input bg-muted/30 p-3">
+                      <div className="text-muted-foreground text-xs font-medium uppercase">{k}</div>
+                      <div className="border-input bg-muted/30 whitespace-pre-wrap rounded-md border p-3">
                         {note[k] ?? "—"}
                       </div>
                     </div>
@@ -1546,12 +1675,12 @@ export default async function EncounterWorkspacePage({
                 {canAmend ? (
                   <form
                     action={amendNote}
-                    className="mt-6 space-y-3 rounded-md border border-warning/30 bg-warning/5 p-4"
+                    className="border-warning/30 bg-warning/5 mt-6 space-y-3 rounded-md border p-4"
                   >
                     <input type="hidden" name="encounter_id" value={encounter.id} />
                     <input type="hidden" name="note_id" value={note.id} />
                     <div className="text-sm font-medium">Amend this note</div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Creates a new draft version (v{note.version + 1}) pre-filled with the current
                       content. The current version stays in the record as <code>amended</code>. A
                       reason is required and logged to the audit trail.
@@ -1575,9 +1704,9 @@ export default async function EncounterWorkspacePage({
             ) : canWrite ? (
               <>
                 {noteIsAmendment && note ? (
-                  <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm">
-                    <strong>Amending:</strong> this is v{note.version} (supersedes v{note.version - 1}).
-                    Prior content is pre-filled. Save and sign when ready.
+                  <div className="border-warning/30 bg-warning/5 mb-4 rounded-md border p-3 text-sm">
+                    <strong>Amending:</strong> this is v{note.version} (supersedes v
+                    {note.version - 1}). Prior content is pre-filled. Save and sign when ready.
                   </div>
                 ) : null}
 
@@ -1585,7 +1714,11 @@ export default async function EncounterWorkspacePage({
                   <input type="hidden" name="encounter_id" value={encounter.id} />
                   <input type="hidden" name="patient_id" value={encounter.patient_id} />
                   {note?.id ? <input type="hidden" name="note_id" value={note.id} /> : null}
-                  <FormField label="Subjective" htmlFor="subjective" helper="HPI, ROS, patient-reported.">
+                  <FormField
+                    label="Subjective"
+                    htmlFor="subjective"
+                    helper="HPI, ROS, patient-reported."
+                  >
                     <Textarea
                       id="subjective"
                       name="subjective"
@@ -1601,7 +1734,11 @@ export default async function EncounterWorkspacePage({
                       defaultValue={note?.objective ?? ""}
                     />
                   </FormField>
-                  <FormField label="Assessment" htmlFor="assessment" helper="Diagnoses, differential.">
+                  <FormField
+                    label="Assessment"
+                    htmlFor="assessment"
+                    helper="Diagnoses, differential."
+                  >
                     <Textarea
                       id="assessment"
                       name="assessment"
@@ -1609,7 +1746,11 @@ export default async function EncounterWorkspacePage({
                       defaultValue={note?.assessment ?? ""}
                     />
                   </FormField>
-                  <FormField label="Plan" htmlFor="plan" helper="Orders, follow-up, patient education.">
+                  <FormField
+                    label="Plan"
+                    htmlFor="plan"
+                    helper="Orders, follow-up, patient education."
+                  >
                     <Textarea id="plan" name="plan" rows={3} defaultValue={note?.plan ?? ""} />
                   </FormField>
                   <div className="flex items-center gap-2">
@@ -1622,12 +1763,12 @@ export default async function EncounterWorkspacePage({
                 {canSign && note && note.status !== "signed" ? (
                   <form
                     action={signNote}
-                    className="mt-6 space-y-3 rounded-md border border-success/30 bg-success/5 p-4"
+                    className="border-success/30 bg-success/5 mt-6 space-y-3 rounded-md border p-4"
                   >
                     <input type="hidden" name="encounter_id" value={encounter.id} />
                     <input type="hidden" name="note_id" value={note.id} />
                     <div className="text-sm font-medium">Ready to sign?</div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Signing freezes the note at this version. A SHA-256 hash of the content is
                       written to <code>public.signatures</code> with your user id. Amendments create
                       a new version.
@@ -1648,10 +1789,29 @@ export default async function EncounterWorkspacePage({
                 ) : null}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No note yet.</p>
+              <p className="text-muted-foreground text-sm">No note yet.</p>
             )}
           </CardContent>
         </Card>
+
+        {/* AI scribe review card — slots between Clinical note and Documents.
+            Renders nothing when user lacks ai:invoke. See docs/ai-scribe-review-ui.md. */}
+        <AIReviewCard
+          encounterId={encounter.id}
+          patientId={encounter.patient_id}
+          session={session}
+          searchParams={{ showLow: sp.showLow }}
+        />
+
+        {/* Charge capture — slots between AI review and Documents. Hidden
+            for users without billing:read or charges:capture. See
+            docs/charge-capture.md. */}
+        <ChargeCaptureCard
+          encounterId={encounter.id}
+          patientId={encounter.patient_id}
+          encounterDate={encounter.start_at.slice(0, 10)}
+          session={session}
+        />
 
         {/* Documents (read-only — upload UI ships with Storage bucket wiring) */}
         <Card>
@@ -1675,7 +1835,7 @@ export default async function EncounterWorkspacePage({
                     <TableRow key={d.id}>
                       <TableCell>
                         <div className="font-medium">{d.label ?? "(unnamed)"}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           <Badge variant="muted">{d.kind.replace(/_/g, " ")}</Badge>{" "}
                           <span className="text-xs">via {d.source}</span>
                         </div>
@@ -1688,10 +1848,10 @@ export default async function EncounterWorkspacePage({
                         {d.signed_at ? (
                           <Badge variant="success">Signed</Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-xs">
                         {new Date(d.created_at).toLocaleDateString()}
                       </TableCell>
                     </TableRow>
@@ -1699,7 +1859,7 @@ export default async function EncounterWorkspacePage({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 No documents attached to this encounter. Upload UI ships in a later slice along with
                 the Supabase Storage bucket configuration.
               </p>
@@ -1724,10 +1884,10 @@ export default async function EncounterWorkspacePage({
                           {h.status}
                         </Badge>
                         {h.amended_from ? (
-                          <span className="text-xs text-muted-foreground">(amendment)</span>
+                          <span className="text-muted-foreground text-xs">(amendment)</span>
                         ) : null}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-muted-foreground text-xs">
                         {h.author?.full_name ?? h.author?.email ?? "—"} ·{" "}
                         {h.signed_at
                           ? `signed ${new Date(h.signed_at).toLocaleString()}`
@@ -1749,32 +1909,34 @@ export default async function EncounterWorkspacePage({
             </CardHeader>
             <CardContent>
               {auditEvents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No audit events yet. Events accrue as notes are created, saved, signed, or amended.
+                <p className="text-muted-foreground text-sm">
+                  No audit events yet. Events accrue as notes are created, saved, signed, or
+                  amended.
                 </p>
               ) : (
                 <ul className="divide-y text-sm">
                   {auditEvents.map((ev) => (
                     <li key={ev.id} className="py-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">
+                        <span className="text-muted-foreground font-mono text-xs">
                           {new Date(ev.occurred_at).toLocaleString()}
                         </span>
                         <Badge variant="muted">{ev.action}</Badge>
-                        {ev.event_type ? (
-                          <Badge variant="default">{ev.event_type}</Badge>
-                        ) : null}
+                        {ev.event_type ? <Badge variant="default">{ev.event_type}</Badge> : null}
                       </div>
                       {ev.row_id ? (
-                        <div className="font-mono text-xs text-muted-foreground">
+                        <div className="text-muted-foreground font-mono text-xs">
                           note {ev.row_id.slice(0, 8)}…
                         </div>
                       ) : null}
                       {ev.details && Object.keys(ev.details).length > 0 ? (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           {Object.entries(ev.details)
                             .slice(0, 3)
-                            .map(([k, v]) => `${k}=${typeof v === "string" ? v.slice(0, 60) : JSON.stringify(v).slice(0, 60)}`)
+                            .map(
+                              ([k, v]) =>
+                                `${k}=${typeof v === "string" ? v.slice(0, 60) : JSON.stringify(v).slice(0, 60)}`,
+                            )
                             .join(", ")}
                         </div>
                       ) : null}
@@ -1782,9 +1944,9 @@ export default async function EncounterWorkspacePage({
                   ))}
                 </ul>
               )}
-              <p className="mt-3 text-xs text-muted-foreground">
-                Showing up to 20 most recent events for notes in this encounter. Full audit viewer at{" "}
-                <code>/admin/security</code> ships in a later slice.
+              <p className="text-muted-foreground mt-3 text-xs">
+                Showing up to 20 most recent events for notes in this encounter. Full audit viewer
+                at <code>/admin/security</code> ships in a later slice.
               </p>
             </CardContent>
           </Card>

@@ -3,7 +3,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 
 import type { AICompletionRequest, AIMessage, AIModel } from "@vitalflow/types";
 
-import type { AIProvider, CompletionChunk } from "./index.js";
+import type { AICompletionResult, AIProvider, CompletionChunk } from "./index.js";
 
 export class OpenAIProvider implements AIProvider {
   public readonly name = "openai" as const;
@@ -26,17 +26,25 @@ export class OpenAIProvider implements AIProvider {
       .map((m) => ({ role: m.role, content: m.content }));
   }
 
-  async complete(
-    request: AICompletionRequest,
-  ): Promise<{ content: string; messages: AIMessage[] }> {
+  async complete(request: AICompletionRequest): Promise<AICompletionResult> {
+    const startedAt = Date.now();
     const response = await this.client.chat.completions.create({
       model: request.model,
       messages: this.toOpenAiMessages(request.messages),
       temperature: request.temperature,
       max_tokens: request.maxTokens,
     });
+    const latencyMs = Date.now() - startedAt;
     const content = response.choices[0]?.message?.content ?? "";
-    return { content, messages: [...request.messages, { role: "assistant", content }] };
+    return {
+      content,
+      messages: [...request.messages, { role: "assistant", content }],
+      usage: {
+        inputTokens: response.usage?.prompt_tokens ?? 0,
+        outputTokens: response.usage?.completion_tokens ?? 0,
+      },
+      latencyMs,
+    };
   }
 
   async *stream(request: AICompletionRequest): AsyncIterable<CompletionChunk> {

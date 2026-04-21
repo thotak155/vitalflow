@@ -1,8 +1,5 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Badge,
   Button,
@@ -96,7 +93,10 @@ function calcAge(dob: string): number {
 // in admin/members and session.ts.
 type WritablePatientsTable = {
   update: (v: Record<string, unknown>) => {
-    eq: (c: string, v: string) => {
+    eq: (
+      c: string,
+      v: string,
+    ) => {
       eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -104,7 +104,10 @@ type WritablePatientsTable = {
 type WritableContactsTable = {
   insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
   update: (v: Record<string, unknown>) => {
-    eq: (c: string, v: string) => {
+    eq: (
+      c: string,
+      v: string,
+    ) => {
       eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -117,7 +120,9 @@ function contactsTable(c: SupabaseServerClient): WritableContactsTable {
   return (c as unknown as { from: (t: string) => WritableContactsTable }).from("patient_contacts");
 }
 function coveragesTable(c: SupabaseServerClient): WritableCoveragesTable {
-  return (c as unknown as { from: (t: string) => WritableCoveragesTable }).from("patient_coverages");
+  return (c as unknown as { from: (t: string) => WritableCoveragesTable }).from(
+    "patient_coverages",
+  );
 }
 
 async function updatePatient(formData: FormData): Promise<void> {
@@ -376,7 +381,7 @@ export default async function PatientDetailPage({
         eyebrow="Patient chart"
         title={displayName}
         description={
-          <span className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-3 text-sm">
             <span className="font-mono">{patient.mrn}</span>
             <span>·</span>
             <span>
@@ -398,18 +403,18 @@ export default async function PatientDetailPage({
       {sp.ok ? (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          className="border-success/30 bg-success/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+          <CheckCircle2 className="text-success mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.ok}</span>
         </div>
       ) : null}
       {sp.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.error}</span>
         </div>
       ) : null}
@@ -448,11 +453,7 @@ export default async function PatientDetailPage({
                     />
                   </FormField>
                   <FormField label="Pronouns" htmlFor="pronouns">
-                    <Input
-                      id="pronouns"
-                      name="pronouns"
-                      defaultValue={patient.pronouns ?? ""}
-                    />
+                    <Input id="pronouns" name="pronouns" defaultValue={patient.pronouns ?? ""} />
                   </FormField>
                   <FormField label="Gender identity" htmlFor="gender_identity">
                     <Input
@@ -493,14 +494,14 @@ export default async function PatientDetailPage({
           </CardHeader>
           <CardContent>
             {contacts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No contacts on file.</p>
+              <p className="text-muted-foreground text-sm">No contacts on file.</p>
             ) : (
               <ul className="mb-4 divide-y">
                 {contacts.map((c) => (
                   <li key={c.id} className="flex items-center justify-between py-2 text-sm">
                     <div>
                       <div className="font-medium">{c.value}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
                         <span>{contactLabel(c.type)}</span>
                         {c.is_primary ? <Badge variant="success">Primary</Badge> : null}
                         {c.verified_at ? <Badge variant="muted">Verified</Badge> : null}
@@ -521,7 +522,10 @@ export default async function PatientDetailPage({
             )}
 
             {canWrite ? (
-              <form action={addContact} className="space-y-3 rounded-md border border-dashed border-border p-4">
+              <form
+                action={addContact}
+                className="border-border space-y-3 rounded-md border border-dashed p-4"
+              >
                 <input type="hidden" name="patient_id" value={patient.id} />
                 <div className="grid gap-3 md:grid-cols-[180px,1fr,auto]">
                   <FormField label="Type" htmlFor="contact-type" required>
@@ -571,7 +575,7 @@ export default async function PatientDetailPage({
                         </Badge>
                         {c.active ? null : <Badge variant="muted">Inactive</Badge>}
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                         <span>
                           Member <span className="font-mono">{c.member_id}</span>
                         </span>
@@ -607,7 +611,7 @@ export default async function PatientDetailPage({
 
             {canWrite ? (
               payers.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border p-4 text-sm">
+                <div className="border-border rounded-md border border-dashed p-4 text-sm">
                   <p>
                     No active payers yet. Go to{" "}
                     <NextLink href="/admin/payers" className="text-primary hover:underline">
@@ -619,7 +623,7 @@ export default async function PatientDetailPage({
               ) : (
                 <form
                   action={addCoverage}
-                  className="space-y-3 rounded-md border border-dashed border-border p-4"
+                  className="border-border space-y-3 rounded-md border border-dashed p-4"
                 >
                   <input type="hidden" name="patient_id" value={patient.id} />
                   <div className="grid gap-3 md:grid-cols-2">
@@ -662,7 +666,11 @@ export default async function PatientDetailPage({
                     <FormField label="Group number" htmlFor="group_number">
                       <Input id="group_number" name="group_number" />
                     </FormField>
-                    <FormField label="Subscriber name" htmlFor="subscriber_name" helper="If not the patient.">
+                    <FormField
+                      label="Subscriber name"
+                      htmlFor="subscriber_name"
+                      helper="If not the patient."
+                    >
                       <Input id="subscriber_name" name="subscriber_name" />
                     </FormField>
                     <FormField label="Relationship" htmlFor="relationship">

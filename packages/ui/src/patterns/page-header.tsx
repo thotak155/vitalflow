@@ -14,22 +14,20 @@ export const PageHeader = React.forwardRef<HTMLElement, PageHeaderProps>(
     <header
       ref={ref}
       className={cn(
-        "flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-start md:justify-between",
+        "border-border flex flex-col gap-4 border-b pb-6 md:flex-row md:items-start md:justify-between",
         className,
       )}
       {...props}
     >
       <div className="min-w-0 space-y-1.5">
         {eyebrow ? (
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             {eyebrow}
           </div>
         ) : null}
-        <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">
-          {title}
-        </h1>
+        <h1 className="text-foreground truncate text-2xl font-semibold tracking-tight">{title}</h1>
         {description ? (
-          <p className="max-w-prose text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground max-w-prose text-sm">{description}</p>
         ) : null}
         {children}
       </div>

@@ -35,12 +35,20 @@ export const DiagnosisAssignmentSchema = z.object({
   encounterId: EncounterIdSchema,
   problemId: ProblemIdSchema.nullable().optional(),
   codeSystem: CodeSystemSchema,
-  code: z.string().min(1).max(32).regex(/^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/i, {
-    message: "Expected ICD-10-CM format, e.g. E11.9",
-  }),
+  code: z
+    .string()
+    .min(1)
+    .max(32)
+    .regex(/^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/i, {
+      message: "Expected ICD-10-CM format, e.g. E11.9",
+    }),
   description: z.string().min(1).max(512),
   rank: z.number().int().min(1).max(12),
-  pointer: z.string().regex(/^[A-L]$/).nullable().optional(),
+  pointer: z
+    .string()
+    .regex(/^[A-L]$/)
+    .nullable()
+    .optional(),
   presentOnAdmission: PresentOnAdmissionSchema.nullable().optional(),
   assignedBy: UserIdSchema,
   assignedAt: z.string().datetime(),

@@ -31,3 +31,13 @@ export const InvoiceSchema = z.object({
   dueAt: z.string().datetime().optional(),
 });
 export type Invoice = z.infer<typeof InvoiceSchema>;
+
+// ---------- V1 Billing / RCM domain -----------------------------------------
+// See docs/billing-rcm.md for the full design.
+
+export * from "./charge.js";
+export * from "./claim.js";
+export * from "./denial.js";
+export * from "./payment.js";
+export * from "./patient-balance.js";
+export * from "./services.js";

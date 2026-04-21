@@ -24,7 +24,7 @@ export const SidebarLayout = React.forwardRef<HTMLDivElement, SidebarLayoutProps
   ({ className, sidebar, topNav, mobileOpen, onMobileOpenChange, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("flex min-h-screen bg-background text-foreground", className)}
+      className={cn("bg-background text-foreground flex min-h-screen", className)}
       {...props}
     >
       <div className="hidden md:block">{sidebar}</div>

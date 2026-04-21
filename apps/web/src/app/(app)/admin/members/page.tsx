@@ -1,9 +1,6 @@
 import { createVitalFlowAdminClient } from "@vitalflow/auth/admin";
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Badge,
   Button,
@@ -67,7 +64,10 @@ type MemberRow = {
 type WritableMembersTable = {
   insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
   update: (v: Record<string, unknown>) => {
-    eq: (col: string, val: string) => {
+    eq: (
+      col: string,
+      val: string,
+    ) => {
       eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -84,7 +84,9 @@ async function createMember(formData: FormData): Promise<void> {
   }
   requirePermission(session, "admin:users");
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const roles = formData.getAll("roles").map(String).filter(Boolean) as StaffRole[];
@@ -228,18 +230,18 @@ export default async function MembersPage({
       {params.ok ? (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          className="border-success/30 bg-success/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+          <CheckCircle2 className="text-success mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{params.ok}</span>
         </div>
       ) : null}
       {params.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{params.error}</span>
         </div>
       ) : null}
@@ -280,7 +282,7 @@ export default async function MembersPage({
                   {ROLE_OPTIONS.map((r) => (
                     <label
                       key={r.value}
-                      className="flex items-center gap-2 rounded-md border border-input bg-background p-2 text-sm"
+                      className="border-input bg-background flex items-center gap-2 rounded-md border p-2 text-sm"
                     >
                       <input type="checkbox" name="roles" value={r.value} />
                       {r.label}
@@ -299,9 +301,9 @@ export default async function MembersPage({
           </CardHeader>
           <CardContent>
             {error ? (
-              <p className="text-sm text-destructive">Failed to load: {error.message}</p>
+              <p className="text-destructive text-sm">Failed to load: {error.message}</p>
             ) : members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No members yet.</p>
+              <p className="text-muted-foreground text-sm">No members yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -318,7 +320,9 @@ export default async function MembersPage({
                     <TableRow key={m.id}>
                       <TableCell>
                         <div className="font-medium">{m.profiles?.full_name ?? "—"}</div>
-                        <div className="text-xs text-muted-foreground">{m.profiles?.email ?? m.user_id}</div>
+                        <div className="text-muted-foreground text-xs">
+                          {m.profiles?.email ?? m.user_id}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -330,18 +334,23 @@ export default async function MembersPage({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={m.status === "active" ? "success" : "muted"}>{m.status}</Badge>
+                        <Badge variant={m.status === "active" ? "success" : "muted"}>
+                          {m.status}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-muted-foreground text-xs">
                         {new Date(m.joined_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
                           <details className="group">
-                            <summary className="cursor-pointer text-xs text-primary hover:underline">
+                            <summary className="text-primary cursor-pointer text-xs hover:underline">
                               Edit roles
                             </summary>
-                            <form action={updateRoles} className="mt-2 flex flex-wrap items-center gap-2">
+                            <form
+                              action={updateRoles}
+                              className="mt-2 flex flex-wrap items-center gap-2"
+                            >
                               <input type="hidden" name="id" value={m.id} />
                               {ROLE_OPTIONS.map((r) => (
                                 <label key={r.value} className="flex items-center gap-1 text-xs">

@@ -104,7 +104,10 @@ export type AppointmentListQuery = z.infer<typeof AppointmentListQuerySchema>;
  * Which statuses a given status can legally transition to. Enforce both in the
  * app layer and (future) via a SQL trigger.
  */
-export const APPOINTMENT_STATUS_TRANSITIONS: Record<AppointmentStatus, readonly AppointmentStatus[]> = {
+export const APPOINTMENT_STATUS_TRANSITIONS: Record<
+  AppointmentStatus,
+  readonly AppointmentStatus[]
+> = {
   scheduled: ["confirmed", "arrived", "no_show", "cancelled", "rescheduled"],
   confirmed: ["arrived", "no_show", "cancelled", "rescheduled"],
   arrived: ["in_progress", "no_show", "cancelled"],

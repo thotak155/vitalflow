@@ -42,13 +42,14 @@ type EncounterRow = {
   provider: { full_name: string | null; email: string } | null;
 };
 
-const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> = {
-  planned: "default",
-  arrived: "warning",
-  in_progress: "warning",
-  finished: "success",
-  cancelled: "destructive",
-};
+const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> =
+  {
+    planned: "default",
+    arrived: "warning",
+    in_progress: "warning",
+    finished: "success",
+    cancelled: "destructive",
+  };
 
 export default async function EncountersListPage({
   searchParams,
@@ -107,7 +108,7 @@ export default async function EncountersListPage({
               id="mine"
               name="mine"
               defaultValue={mineOnly ? "1" : "0"}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
             >
               <option value="1">My encounters</option>
               <option value="0">All providers</option>
@@ -120,7 +121,7 @@ export default async function EncountersListPage({
               id="status"
               name="status"
               defaultValue={statusFilter}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
             >
               <option value="">All</option>
               <option value="planned">Planned</option>
@@ -143,7 +144,7 @@ export default async function EncountersListPage({
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="text-sm text-destructive">Failed to load: {error.message}</p>
+            <p className="text-destructive text-sm">Failed to load: {error.message}</p>
           ) : rows.length === 0 ? (
             <EmptyState
               title="No encounters"
@@ -185,11 +186,15 @@ export default async function EncountersListPage({
                         <span className="text-muted-foreground">—</span>
                       )}
                       {e.patient ? (
-                        <div className="font-mono text-xs text-muted-foreground">{e.patient.mrn}</div>
+                        <div className="text-muted-foreground font-mono text-xs">
+                          {e.patient.mrn}
+                        </div>
                       ) : null}
                     </TableCell>
                     <TableCell>{e.provider?.full_name ?? e.provider?.email ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{e.chief_complaint ?? e.reason ?? "—"}</TableCell>
+                    <TableCell className="text-sm">
+                      {e.chief_complaint ?? e.reason ?? "—"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANTS[e.status] ?? "default"}>
                         {e.status.replace(/_/g, " ")}

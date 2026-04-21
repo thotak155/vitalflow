@@ -1,13 +1,5 @@
 import { createVitalFlowServerClient } from "@vitalflow/auth/server";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  FormField,
-  Input,
-} from "@vitalflow/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, FormField, Input } from "@vitalflow/ui";
 import { AlertCircle, HeartPulse } from "@vitalflow/ui/icons";
 import { redirect } from "next/navigation";
 
@@ -21,7 +13,9 @@ async function setInitialPassword(formData: FormData): Promise<void> {
   const confirm = String(formData.get("confirm") ?? "");
 
   if (password.length < 12) {
-    redirect(`/set-password?error=${encodeURIComponent("Password must be at least 12 characters")}`);
+    redirect(
+      `/set-password?error=${encodeURIComponent("Password must be at least 12 characters")}`,
+    );
   }
   if (password !== confirm) {
     redirect(`/set-password?error=${encodeURIComponent("Passwords don't match")}`);
@@ -48,28 +42,31 @@ export default async function SetPasswordPage({
   const supabase = await createVitalFlowServerClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) {
-    redirect(`/login?error=${encodeURIComponent("Invite link expired — ask your administrator to resend")}`);
+    redirect(
+      `/login?error=${encodeURIComponent("Invite link expired — ask your administrator to resend")}`,
+    );
   }
 
   return (
     <Card className="shadow-vf-md">
       <CardHeader className="items-center text-center">
-        <div className="flex items-center gap-2 text-primary">
+        <div className="text-primary flex items-center gap-2">
           <HeartPulse className="h-6 w-6" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">VitalFlow</span>
         </div>
         <CardTitle>Welcome — set your password</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          You&apos;re signed in as <span className="font-medium">{data.user.email}</span>. Pick a password to finish setting up your account.
+        <p className="text-muted-foreground text-sm">
+          You&apos;re signed in as <span className="font-medium">{data.user.email}</span>. Pick a
+          password to finish setting up your account.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground"
+            className="border-destructive/30 bg-destructive/5 text-foreground flex items-start gap-2 rounded-md border p-3 text-sm"
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+            <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>{error}</span>
           </div>
         ) : null}

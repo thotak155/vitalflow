@@ -7,22 +7,11 @@
     "eslint.config.mjs",
     ".prettierrc.js"
   ],
-  "globalEnv": [
-    "NODE_ENV",
-    "VERCEL_ENV",
-    "VERCEL_URL",
-    "ANALYZE",
-    "CI"
-  ],
+  "globalEnv": ["NODE_ENV", "VERCEL_ENV", "VERCEL_URL", "ANALYZE", "CI"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [
-        ".next/**",
-        "!.next/cache/**",
-        "dist/**",
-        "build/**"
-      ],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "build/**"],
       "env": [
         "NEXT_PUBLIC_*",
         "SUPABASE_URL",

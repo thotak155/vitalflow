@@ -18,18 +18,18 @@ export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
       role="status"
       aria-live="polite"
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border px-6 py-12 text-center",
+        "border-border flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center",
         className,
       )}
       {...props}
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+      <div className="bg-muted text-muted-foreground flex h-12 w-12 items-center justify-center rounded-full">
         <Icon className="h-6 w-6" aria-hidden />
       </div>
       <div className="space-y-1">
-        <div className="text-base font-medium text-foreground">{title}</div>
+        <div className="text-foreground text-base font-medium">{title}</div>
         {description ? (
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">{description}</p>
+          <p className="text-muted-foreground mx-auto max-w-sm text-sm">{description}</p>
         ) : null}
       </div>
       {action ? <div className="mt-2">{action}</div> : null}

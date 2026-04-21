@@ -1,5 +1,8 @@
 import {
+  AlertCircle,
   ClipboardList,
+  CreditCard,
+  FileText,
   HeartPulse,
   Inbox,
   LayoutDashboard,
@@ -52,6 +55,33 @@ export const providerNav: readonly NavSection[] = [
         icon: Pill,
         requires: ["clinical:read"],
         comingSoon: true,
+      },
+    ],
+  },
+  {
+    id: "billing",
+    label: "Billing",
+    items: [
+      {
+        id: "claims",
+        label: "Claims",
+        href: "/billing/claims",
+        icon: FileText,
+        requires: ["billing:read"],
+      },
+      {
+        id: "denials",
+        label: "Denials",
+        href: "/billing/denials",
+        icon: AlertCircle,
+        requires: ["billing:read"],
+      },
+      {
+        id: "balances",
+        label: "Balances",
+        href: "/billing/balances",
+        icon: CreditCard,
+        requires: ["billing:read"],
       },
     ],
   },

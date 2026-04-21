@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/AI/Vital Flow\" remote -v)",
+      "Bash(git -C \"c:/AI/Vital Flow\" branch -a)",
+      "Bash(git -C \"c:/AI/Vital Flow\" ls-remote --heads origin)",
+      "Bash(git -C \"c:/AI/Vital Flow\" log --oneline -5)",
+      "Bash(git -C \"c:/AI/Vital Flow\" status)",
+      "mcp__claude_ai_Supabase__get_project",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(command -v vercel)",
+      "Bash(vercel --version)",
+      "Bash(command -v gh)",
+      "Bash(gh auth *)",
+      "Bash(where gh *)",
+      "Bash(where vercel *)",
+      "mcp__claude_ai_Supabase__get_logs",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(pnpm --filter @vitalflow/web typecheck)",
+      "Bash(git -C \"c:/AI/Vital Flow\" add docs/patient-appointment-ui.md 'apps/web/src/app/\\(app\\)/appointments/page.tsx')",
+      "Bash(git -C 'c:/AI/Vital Flow' commit -m ' *)",
+      "Bash(git -C \"c:/AI/Vital Flow\" push origin main)",
+      "Bash(pnpm add *)"
+    ]
+  }
+}

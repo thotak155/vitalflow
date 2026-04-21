@@ -118,6 +118,7 @@ export interface SoapDraftService {
     ctx: ScribeServiceContext,
     params: {
       sessionId: AIScribeSessionId;
+      aiRequestId: string;
       segments: readonly AIScribeTranscriptSegment[];
       patientContextHints: {
         ageYears?: number;
@@ -127,6 +128,7 @@ export interface SoapDraftService {
         currentMedications?: readonly string[];
       };
       modelOverride?: string;
+      promptVersionOverride?: string;
     },
   ): Promise<{
     draft: SoapDraft;
@@ -134,6 +136,8 @@ export interface SoapDraftService {
     tokensOut: number;
     latencyMs: number;
     costMicrosUsd: number;
+    promptId: string;
+    promptVersion: string;
   }>;
 }
 
@@ -143,16 +147,38 @@ export interface CodeSuggestionService {
     ctx: ScribeServiceContext,
     params: {
       sessionId: AIScribeSessionId;
+      aiRequestId: string;
       draft: SoapDraft;
       segments: readonly AIScribeTranscriptSegment[];
+      patientContextHints: {
+        ageYears?: number;
+        sexAtBirth?: string;
+        chiefComplaint?: string;
+        knownAllergies?: readonly string[];
+        currentMedications?: readonly string[];
+        activeProblemList?: readonly string[];
+      };
+      visitContext: {
+        type?: string;
+        setting?: string;
+        isNewPatient?: boolean;
+        durationMinutes?: number;
+      };
       modelOverride?: string;
+      promptVersionOverride?: string;
     },
   ): Promise<{
-    codes: Omit<AIScribeCodeSuggestion, "id" | "tenantId" | "sessionId" | "encounterId" | "createdAt">[];
+    codes: Omit<
+      AIScribeCodeSuggestion,
+      "id" | "tenantId" | "sessionId" | "encounterId" | "createdAt"
+    >[];
+    warnings: string[];
     tokensIn: number;
     tokensOut: number;
     latencyMs: number;
     costMicrosUsd: number;
+    promptId: string;
+    promptVersion: string;
   }>;
 }
 

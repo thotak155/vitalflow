@@ -22,7 +22,7 @@ export function SurfaceSwitcher({ active, available }: SurfaceSwitcherProps) {
     <div
       role="group"
       aria-label="Switch workspace"
-      className="flex items-center gap-0.5 rounded-md border border-border bg-muted p-0.5"
+      className="border-border bg-muted flex items-center gap-0.5 rounded-md border p-0.5"
     >
       {available.map((surface) => {
         const isActive = surface === active;

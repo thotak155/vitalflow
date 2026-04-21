@@ -1,8 +1,5 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Badge,
   Button,
@@ -47,7 +44,10 @@ type PayerRow = {
 type WritablePayersTable = {
   insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
   update: (v: Record<string, unknown>) => {
-    eq: (c: string, v: string) => {
+    eq: (
+      c: string,
+      v: string,
+    ) => {
       eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
     };
   };
@@ -108,14 +108,12 @@ async function togglePayerActive(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/admin/payers");
-  redirect(`/admin/payers?ok=${encodeURIComponent(next ? "Payer activated" : "Payer deactivated")}`);
+  redirect(
+    `/admin/payers?ok=${encodeURIComponent(next ? "Payer activated" : "Payer deactivated")}`,
+  );
 }
 
-export default async function PayersPage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>;
-}) {
+export default async function PayersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const session = await getSession();
   if (!session) redirect("/login?next=/admin/payers");
   requirePermission(session, "admin:billing_config");
@@ -145,18 +143,18 @@ export default async function PayersPage({
       {sp.ok ? (
         <div
           role="status"
-          className="mb-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm"
+          className="border-success/30 bg-success/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
+          <CheckCircle2 className="text-success mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.ok}</span>
         </div>
       ) : null}
       {sp.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{sp.error}</span>
         </div>
       ) : null}
@@ -190,7 +188,7 @@ export default async function PayersPage({
           </CardHeader>
           <CardContent>
             {error ? (
-              <p className="text-sm text-destructive">Failed to load: {error.message}</p>
+              <p className="text-destructive text-sm">Failed to load: {error.message}</p>
             ) : rows.length === 0 ? (
               <EmptyState
                 title="No payers yet"

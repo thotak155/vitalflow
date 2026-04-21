@@ -5,10 +5,22 @@ export interface CompletionChunk {
   done: boolean;
 }
 
+export interface AIProviderUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+export interface AICompletionResult {
+  readonly content: string;
+  readonly messages: readonly AIMessage[];
+  readonly usage: AIProviderUsage;
+  readonly latencyMs: number;
+}
+
 export interface AIProvider {
   readonly name: "anthropic" | "openai";
   readonly supports: readonly AIModel[];
-  complete(request: AICompletionRequest): Promise<{ content: string; messages: AIMessage[] }>;
+  complete(request: AICompletionRequest): Promise<AICompletionResult>;
   stream(request: AICompletionRequest): AsyncIterable<CompletionChunk>;
 }
 

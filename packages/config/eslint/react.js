@@ -12,7 +12,7 @@ export default [
     plugins: {
       react,
       "react-hooks": reactHooks,
-      "jsx-a11y": jsxA11y
+      "jsx-a11y": jsxA11y,
     },
     settings: { react: { version: "detect" } },
     rules: {
@@ -22,7 +22,7 @@ export default [
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
       "react/jsx-uses-react": "off",
-      "react/self-closing-comp": "warn"
-    }
-  }
+      "react/self-closing-comp": "warn",
+    },
+  },
 ];

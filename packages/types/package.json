@@ -15,7 +15,10 @@
     "./tenancy": "./src/tenancy/index.ts",
     "./ai": "./src/ai/index.ts"
   },
-  "files": ["src", "dist"],
+  "files": [
+    "src",
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",

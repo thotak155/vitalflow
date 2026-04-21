@@ -24,11 +24,10 @@ See [docs/devops-strategy.md §7](../../docs/devops-strategy.md#7-branch-protect
 
 ## GitHub Environments (required)
 
-Independent of branch protection, these environments must exist in the repo
-Settings → Environments:
+Independent of branch protection, these environments must exist in the repo Settings → Environments:
 
-| Environment            | Required reviewers                        | Secrets                                                                                                 |
-| ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `staging`              | None                                      | `VERCEL_*`, `SUPABASE_*_STAGING`, `SLACK_WEBHOOK_DEPLOY`                                                |
-| `production`           | `ops-production` team (1 approver)        | `VERCEL_*`, `SUPABASE_*_PROD`, `SENTRY_AUTH_TOKEN`, `SLACK_WEBHOOK_DEPLOY`                              |
-| `production-readonly`  | None                                      | `SUPABASE_ACCESS_TOKEN` (read-only scope); used by the scheduled security advisor job                   |
+| Environment           | Required reviewers                 | Secrets                                                                               |
+| --------------------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
+| `staging`             | None                               | `VERCEL_*`, `SUPABASE_*_STAGING`, `SLACK_WEBHOOK_DEPLOY`                              |
+| `production`          | `ops-production` team (1 approver) | `VERCEL_*`, `SUPABASE_*_PROD`, `SENTRY_AUTH_TOKEN`, `SLACK_WEBHOOK_DEPLOY`            |
+| `production-readonly` | None                               | `SUPABASE_ACCESS_TOKEN` (read-only scope); used by the scheduled security advisor job |

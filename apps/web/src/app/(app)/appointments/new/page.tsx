@@ -1,8 +1,5 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
-import {
-  createVitalFlowServerClient,
-  type SupabaseServerClient,
-} from "@vitalflow/auth/server";
+import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
   Button,
   Card,
@@ -154,10 +151,12 @@ export default async function NewAppointmentPage({
     .eq("tenant_id", session.tenantId)
     .eq("status", "active")
     .is("deleted_at", null);
-  const providers = ((providersRaw ?? []) as unknown as {
-    user_id: string;
-    profiles: { full_name: string | null; email: string } | null;
-  }[])
+  const providers = (
+    (providersRaw ?? []) as unknown as {
+      user_id: string;
+      profiles: { full_name: string | null; email: string } | null;
+    }[]
+  )
     .map<ProviderOption>((r) => ({
       user_id: r.user_id,
       full_name: r.profiles?.full_name ?? null,
@@ -205,9 +204,9 @@ export default async function NewAppointmentPage({
       {params.error ? (
         <div
           role="alert"
-          className="mb-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          className="border-destructive/30 bg-destructive/5 mb-4 flex items-start gap-2 rounded-md border p-3 text-sm"
         >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+          <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>{params.error}</span>
         </div>
       ) : null}
@@ -219,12 +218,12 @@ export default async function NewAppointmentPage({
         <CardContent>
           <form action={createAppointment} className="space-y-4">
             {presetPatient ? (
-              <div className="rounded-md border border-input bg-muted/30 p-3 text-sm">
-                <div className="text-xs uppercase text-muted-foreground">Patient</div>
+              <div className="border-input bg-muted/30 rounded-md border p-3 text-sm">
+                <div className="text-muted-foreground text-xs uppercase">Patient</div>
                 <div className="font-medium">
                   {presetPatient.given_name} {presetPatient.family_name}
                 </div>
-                <div className="font-mono text-xs text-muted-foreground">{presetPatient.mrn}</div>
+                <div className="text-muted-foreground font-mono text-xs">{presetPatient.mrn}</div>
                 <input type="hidden" name="patient_id" value={presetPatientId} />
               </div>
             ) : (
@@ -257,7 +256,9 @@ export default async function NewAppointmentPage({
               <FormField label="Location" htmlFor="location_id" helper="Optional.">
                 <Select name="location_id">
                   <SelectTrigger id="location_id">
-                    <SelectValue placeholder={locations.length ? "Select a location" : "No locations"} />
+                    <SelectValue
+                      placeholder={locations.length ? "Select a location" : "No locations"}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((l) => (
@@ -299,7 +300,12 @@ export default async function NewAppointmentPage({
             </div>
 
             <FormField label="Reason for visit" htmlFor="reason">
-              <Textarea id="reason" name="reason" rows={3} placeholder="Chief complaint or follow-up…" />
+              <Textarea
+                id="reason"
+                name="reason"
+                rows={3}
+                placeholder="Chief complaint or follow-up…"
+              />
             </FormField>
 
             <div className="flex items-center gap-2">

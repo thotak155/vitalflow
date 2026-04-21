@@ -50,6 +50,12 @@ export const AUDIT_EVENT_TYPES = [
   "ai.draft_accepted",
   "ai.draft_rejected",
   "ai.draft_edited_and_signed",
+  "ai.scribe_session_created",
+  "ai.scribe_session_cancelled",
+  "ai.transcript_submitted",
+  "ai.codes_suggested",
+  "ai.invocation_blocked",
+  "ai.hallucinated_trace",
   // Revenue cycle
   "charge.created",
   "charge.updated",
@@ -64,6 +70,10 @@ export const AUDIT_EVENT_TYPES = [
   "payment.recorded",
   "payment.refunded",
   "write_off.applied",
+  "denial.created",
+  "denial.assigned",
+  "denial.resolved",
+  "patient_balance.recalculated",
   // Administrative
   "admin.setting_changed",
   "admin.integration_connected",
@@ -227,7 +237,11 @@ export interface AuthLoginDetails {
 }
 
 export async function logLogin(
-  params: { tenantId: string | null; actorId: string; request?: AuditRequestContext } & AuthLoginDetails,
+  params: {
+    tenantId: string | null;
+    actorId: string;
+    request?: AuditRequestContext;
+  } & AuthLoginDetails,
 ): Promise<void> {
   await logEventBestEffort({
     tenantId: params.tenantId,
@@ -238,14 +252,12 @@ export async function logLogin(
   });
 }
 
-export async function logLoginFailed(
-  params: {
-    tenantId: string | null;
-    attemptedEmail: string;
-    reason: string;
-    request?: AuditRequestContext;
-  },
-): Promise<void> {
+export async function logLoginFailed(params: {
+  tenantId: string | null;
+  attemptedEmail: string;
+  reason: string;
+  request?: AuditRequestContext;
+}): Promise<void> {
   await logEventBestEffort({
     tenantId: params.tenantId,
     actorId: null,
@@ -290,18 +302,16 @@ export async function logAiDraftGenerated(
   });
 }
 
-export async function logImpersonationStarted(
-  params: {
-    tenantId: string;
-    impersonatorId: string;
-    targetUserId: string;
-    sessionId: string;
-    reason: string;
-    approvedBy: string | null;
-    durationMinutes: number;
-    request?: AuditRequestContext;
-  },
-): Promise<void> {
+export async function logImpersonationStarted(params: {
+  tenantId: string;
+  impersonatorId: string;
+  targetUserId: string;
+  sessionId: string;
+  reason: string;
+  approvedBy: string | null;
+  durationMinutes: number;
+  request?: AuditRequestContext;
+}): Promise<void> {
   await logEvent({
     tenantId: params.tenantId,
     actorId: params.impersonatorId,
@@ -319,15 +329,13 @@ export async function logImpersonationStarted(
   });
 }
 
-export async function logImpersonationEnded(
-  params: {
-    tenantId: string;
-    sessionId: string;
-    endedBy: string;
-    endedByKind: "self" | "admin" | "expired";
-    request?: AuditRequestContext;
-  },
-): Promise<void> {
+export async function logImpersonationEnded(params: {
+  tenantId: string;
+  sessionId: string;
+  endedBy: string;
+  endedByKind: "self" | "admin" | "expired";
+  request?: AuditRequestContext;
+}): Promise<void> {
   await logEvent({
     tenantId: params.tenantId,
     actorId: params.endedBy,

@@ -30,9 +30,7 @@ export async function requireSession(resolver: SessionResolver): Promise<TenantC
 /** Throws 403 if the user's kind is not in the allow-list. */
 export function requireUserKind(ctx: TenantContext, allowed: readonly UserKind[]): TenantContext {
   if (!allowed.includes(ctx.userKind)) {
-    throw forbidden(
-      `Surface requires user kind in [${allowed.join(", ")}] (got ${ctx.userKind})`,
-    );
+    throw forbidden(`Surface requires user kind in [${allowed.join(", ")}] (got ${ctx.userKind})`);
   }
   return ctx;
 }

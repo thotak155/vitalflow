@@ -1,10 +1,5 @@
 import { forbidden } from "@vitalflow/shared-utils/errors";
-import type {
-  Permission,
-  StaffRole,
-  TenantContext,
-  TenantId,
-} from "@vitalflow/types";
+import type { Permission, StaffRole, TenantContext, TenantId } from "@vitalflow/types";
 
 /**
  * Role → permission map.
@@ -37,6 +32,7 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     "billing:collect",
     "billing:adjust",
     "billing:write_off",
+    "charges:capture",
     "admin:tenant",
     "admin:users",
     "admin:billing_config",
@@ -54,6 +50,7 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     "billing:collect",
     "billing:adjust",
     "billing:write_off",
+    "charges:capture",
     "schedule:read",
     "schedule:write",
     "patient:read",
@@ -73,6 +70,7 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     "order:create",
     "order:resolve",
     "schedule:read",
+    "charges:capture",
     "ai:invoke",
   ],
   nurse_ma: [
@@ -82,6 +80,7 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     "patient:write",
     "order:create",
     "schedule:read",
+    "charges:capture",
     "ai:invoke",
   ],
   scheduler: ["schedule:read", "schedule:write", "patient:read", "patient:demographics_only"],
@@ -91,17 +90,40 @@ const ROLE_PERMISSIONS: Record<StaffRole, readonly Permission[]> = {
     "billing:collect",
     "billing:adjust",
     "billing:write_off",
+    "charges:capture",
     "clinical:read",
     "patient:read",
   ],
 };
 
-/** Permissions stripped from an effective set while the caller is impersonating. */
+/**
+ * Permissions stripped from an effective set while the caller is impersonating.
+ *
+ * Policy: impersonators can read almost everything but cannot mutate clinical
+ * or financial state on behalf of a practice. Every write-capable permission
+ * here means "impersonators cannot perform this action even if the target
+ * user could." See docs/security-architecture.md §impersonation.
+ *
+ * When adding a new write permission, ask: "should a support engineer acting
+ * as a physician / biller be able to perform this?" If no → add it here.
+ */
 const IMPERSONATION_BLOCKED: readonly Permission[] = [
+  // Clinical writes
+  "clinical:write",
   "clinical:sign",
+  "clinical:amend",
+  "rx:create",
   "rx:sign",
+  "rx:refill",
+  "order:create",
+  "order:resolve",
+  // Billing writes (including charge capture via the scoped permission)
+  "billing:write",
+  "billing:collect",
   "billing:adjust",
   "billing:write_off",
+  "charges:capture",
+  // Admin user mgmt
   "admin:users",
 ];
 
@@ -144,17 +166,11 @@ export function hasPermission(ctx: TenantContext, permission: Permission): boole
   return ctx.permissions.includes(permission);
 }
 
-export function hasAnyPermission(
-  ctx: TenantContext,
-  permissions: readonly Permission[],
-): boolean {
+export function hasAnyPermission(ctx: TenantContext, permissions: readonly Permission[]): boolean {
   return permissions.some((p) => ctx.permissions.includes(p));
 }
 
-export function hasAllPermissions(
-  ctx: TenantContext,
-  permissions: readonly Permission[],
-): boolean {
+export function hasAllPermissions(ctx: TenantContext, permissions: readonly Permission[]): boolean {
   return permissions.every((p) => ctx.permissions.includes(p));
 }
 

@@ -46,16 +46,17 @@ type AppointmentRow = {
 
 type ViewMode = "list" | "week";
 
-const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> = {
-  scheduled: "default",
-  confirmed: "success",
-  arrived: "warning",
-  in_progress: "warning",
-  completed: "success",
-  cancelled: "destructive",
-  no_show: "destructive",
-  rescheduled: "muted",
-};
+const STATUS_VARIANTS: Record<string, "muted" | "success" | "warning" | "destructive" | "default"> =
+  {
+    scheduled: "default",
+    confirmed: "success",
+    arrived: "warning",
+    in_progress: "warning",
+    completed: "success",
+    cancelled: "destructive",
+    no_show: "destructive",
+    rescheduled: "muted",
+  };
 
 // Week grid time window (local to the UI; data is UTC — tz-aware label rendering
 // lands with the locations.timezone wiring).
@@ -91,11 +92,7 @@ function addDays(d: Date, days: number): Date {
   return next;
 }
 
-function buildHref(params: {
-  view: ViewMode;
-  date: string;
-  status?: string;
-}): string {
+function buildHref(params: { view: ViewMode; date: string; status?: string }): string {
   const sp = new URLSearchParams({
     view: params.view,
     date: params.date,
@@ -153,9 +150,7 @@ export default async function AppointmentsListPage({
 
   const title = view === "week" ? "Week of" : "Day of";
   const rangeLabel =
-    view === "week"
-      ? `${isoDateOnly(rangeStart)} – ${isoDateOnly(addDays(rangeStart, 6))}`
-      : date;
+    view === "week" ? `${isoDateOnly(rangeStart)} – ${isoDateOnly(addDays(rangeStart, 6))}` : date;
 
   return (
     <>
@@ -189,7 +184,7 @@ export default async function AppointmentsListPage({
               id="status"
               name="status"
               defaultValue={statusFilter}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
             >
               <option value="">All</option>
               <option value="scheduled">Scheduled</option>
@@ -206,7 +201,7 @@ export default async function AppointmentsListPage({
           Apply
         </Button>
         <div className="ml-auto flex items-center gap-2">
-          <div className="inline-flex rounded-md border border-input overflow-hidden">
+          <div className="border-input inline-flex overflow-hidden rounded-md border">
             <NextLink
               href={buildHref({ view: "list", date, status: statusFilter })}
               className={`px-3 py-1.5 text-xs ${view === "list" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
@@ -246,7 +241,7 @@ export default async function AppointmentsListPage({
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="text-sm text-destructive">Failed to load: {error.message}</p>
+            <p className="text-destructive text-sm">Failed to load: {error.message}</p>
           ) : rows.length === 0 ? (
             <EmptyState
               title={view === "week" ? "No appointments this week" : "No appointments"}
@@ -309,7 +304,7 @@ function ListView({ rows }: { rows: readonly AppointmentRow[] }) {
                 <span className="text-muted-foreground">—</span>
               )}
               {a.patient ? (
-                <div className="font-mono text-xs text-muted-foreground">{a.patient.mrn}</div>
+                <div className="text-muted-foreground font-mono text-xs">{a.patient.mrn}</div>
               ) : null}
             </TableCell>
             <TableCell>{a.provider?.full_name ?? a.provider?.email ?? "—"}</TableCell>
@@ -353,22 +348,19 @@ function WeekGrid({
     byDay.get(key)!.push(a);
   }
 
-  const hourLabels = Array.from(
-    { length: HOUR_END - HOUR_START + 1 },
-    (_, i) => HOUR_START + i,
-  );
+  const hourLabels = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
 
   return (
     <div className="overflow-x-auto">
       <div
-        className="grid min-w-[720px] border border-border rounded-md"
+        className="border-border grid min-w-[720px] rounded-md border"
         style={{
           gridTemplateColumns: "72px repeat(7, 1fr)",
           gridTemplateRows: `32px repeat(${BODY_ROWS}, ${SLOT_HEIGHT_REM}rem)`,
         }}
       >
         {/* top-left corner */}
-        <div className="border-b border-r border-border bg-muted/30" />
+        <div className="border-border bg-muted/30 border-b border-r" />
 
         {/* day headers */}
         {days.map((d) => {
@@ -382,7 +374,7 @@ function WeekGrid({
           return (
             <div
               key={key}
-              className={`border-b border-r border-border bg-muted/30 px-2 py-1 text-xs font-medium ${
+              className={`border-border bg-muted/30 border-b border-r px-2 py-1 text-xs font-medium ${
                 isToday ? "text-primary" : ""
               }`}
             >
@@ -395,7 +387,7 @@ function WeekGrid({
         {hourLabels.slice(0, -1).map((h, i) => (
           <div
             key={`hour-${h}`}
-            className="border-r border-border px-2 pt-0.5 text-right text-[10px] font-mono text-muted-foreground"
+            className="border-border text-muted-foreground border-r px-2 pt-0.5 text-right font-mono text-[10px]"
             style={{
               gridColumn: 1,
               gridRowStart: HEADER_ROW + 1 + i * SLOTS_PER_HOUR,
@@ -411,7 +403,7 @@ function WeekGrid({
           hourLabels.slice(0, -1).map((_h, i) => (
             <div
               key={`${colIdx}-bg-${i}`}
-              className="border-r border-t border-border/40"
+              className="border-border/40 border-r border-t"
               style={{
                 gridColumn: colIdx + 2,
                 gridRowStart: HEADER_ROW + 1 + i * SLOTS_PER_HOUR,
@@ -442,7 +434,9 @@ function WeekGrid({
 
             const rowStart = HEADER_ROW + 1 + Math.floor((clampedStart - windowStart) / 15);
             const rowEnd =
-              HEADER_ROW + 1 + Math.max(rowStart - HEADER_ROW, Math.ceil((clampedEnd - windowStart) / 15));
+              HEADER_ROW +
+              1 +
+              Math.max(rowStart - HEADER_ROW, Math.ceil((clampedEnd - windowStart) / 15));
 
             const variant = STATUS_VARIANTS[a.status] ?? "default";
             const bg =
@@ -460,7 +454,7 @@ function WeekGrid({
               <NextLink
                 key={a.id}
                 href={`/appointments/${a.id}`}
-                className={`m-[2px] overflow-hidden rounded-md border p-1 text-[11px] leading-tight hover:ring-2 hover:ring-primary/40 ${bg}`}
+                className={`hover:ring-primary/40 m-[2px] overflow-hidden rounded-md border p-1 text-[11px] leading-tight hover:ring-2 ${bg}`}
                 style={{
                   gridColumn: colIdx + 2,
                   gridRowStart: rowStart,
@@ -468,24 +462,20 @@ function WeekGrid({
                 }}
                 title={`${a.patient?.given_name ?? ""} ${a.patient?.family_name ?? ""} — ${a.reason ?? ""}`}
               >
-                <div className="font-mono text-[10px] text-muted-foreground">
+                <div className="text-muted-foreground font-mono text-[10px]">
                   {formatTime(a.start_at)}
                 </div>
                 <div className="truncate font-medium">
-                  {a.patient
-                    ? `${a.patient.given_name} ${a.patient.family_name}`
-                    : "No patient"}
+                  {a.patient ? `${a.patient.given_name} ${a.patient.family_name}` : "No patient"}
                 </div>
-                {a.reason ? (
-                  <div className="truncate text-muted-foreground">{a.reason}</div>
-                ) : null}
+                {a.reason ? <div className="text-muted-foreground truncate">{a.reason}</div> : null}
               </NextLink>
             );
           });
         })}
       </div>
 
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-2 text-xs">
         Showing {HOUR_START}:00–{HOUR_END}:00 UTC. Appointments outside this window hidden in grid
         view — switch to List to see everything.
       </p>

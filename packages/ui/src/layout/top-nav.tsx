@@ -50,7 +50,7 @@ export const TopNav = React.forwardRef<HTMLElement, TopNavProps>(
     <header
       ref={ref}
       className={cn(
-        "sticky top-0 z-30 flex h-[var(--vf-topnav-height)] items-center gap-3 border-b border-border bg-background px-4",
+        "border-border bg-background sticky top-0 z-30 flex h-[var(--vf-topnav-height)] items-center gap-3 border-b px-4",
         className,
       )}
       {...props}
@@ -71,7 +71,7 @@ export const TopNav = React.forwardRef<HTMLElement, TopNavProps>(
         {breadcrumbs ? (
           breadcrumbs
         ) : title ? (
-          <div className="truncate text-sm font-medium text-foreground">{title}</div>
+          <div className="text-foreground truncate text-sm font-medium">{title}</div>
         ) : null}
       </div>
 
@@ -84,14 +84,14 @@ export const TopNav = React.forwardRef<HTMLElement, TopNavProps>(
             <DropdownPrimitive.Trigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                className="hover:bg-muted focus:ring-ring flex items-center gap-2 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2"
                 aria-label="Open account menu"
               >
                 <Avatar user={user} />
                 <div className="hidden text-left sm:block">
                   <div className="text-sm font-medium leading-tight">{user.name}</div>
                   {user.roleLabel ? (
-                    <div className="text-xs text-muted-foreground">{user.roleLabel}</div>
+                    <div className="text-muted-foreground text-xs">{user.roleLabel}</div>
                   ) : null}
                 </div>
               </button>
@@ -100,22 +100,28 @@ export const TopNav = React.forwardRef<HTMLElement, TopNavProps>(
               <DropdownPrimitive.Content
                 align="end"
                 sideOffset={8}
-                className="z-50 min-w-56 rounded-md border border-border bg-background p-1 shadow-vf-md"
+                className="border-border bg-background shadow-vf-md z-50 min-w-56 rounded-md border p-1"
               >
                 {user.email ? (
                   <div className="px-3 py-2">
                     <div className="text-sm font-medium">{user.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+                    <div className="text-muted-foreground truncate text-xs">{user.email}</div>
                   </div>
                 ) : null}
-                <DropdownPrimitive.Separator className="my-1 h-px bg-border" />
-                <DropdownItem onSelect={onOpenProfile} icon={<UserRound className="h-4 w-4" aria-hidden />}>
+                <DropdownPrimitive.Separator className="bg-border my-1 h-px" />
+                <DropdownItem
+                  onSelect={onOpenProfile}
+                  icon={<UserRound className="h-4 w-4" aria-hidden />}
+                >
                   Profile
                 </DropdownItem>
-                <DropdownItem onSelect={onOpenSettings} icon={<Settings className="h-4 w-4" aria-hidden />}>
+                <DropdownItem
+                  onSelect={onOpenSettings}
+                  icon={<Settings className="h-4 w-4" aria-hidden />}
+                >
                   Settings
                 </DropdownItem>
-                <DropdownPrimitive.Separator className="my-1 h-px bg-border" />
+                <DropdownPrimitive.Separator className="bg-border my-1 h-px" />
                 <DropdownItem
                   onSelect={onSignOut}
                   icon={<LogOut className="h-4 w-4" aria-hidden />}
@@ -142,7 +148,7 @@ function Avatar({ user }: { user: TopNavUser }) {
     .join("")
     .toUpperCase();
   return (
-    <AvatarPrimitive.Root className="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted">
+    <AvatarPrimitive.Root className="bg-muted relative flex h-8 w-8 shrink-0 overflow-hidden rounded-full">
       {user.avatarUrl ? (
         <AvatarPrimitive.Image
           src={user.avatarUrl}
@@ -150,7 +156,7 @@ function Avatar({ user }: { user: TopNavUser }) {
           className="aspect-square h-full w-full"
         />
       ) : null}
-      <AvatarPrimitive.Fallback className="flex h-full w-full items-center justify-center text-xs font-medium text-muted-foreground">
+      <AvatarPrimitive.Fallback className="text-muted-foreground flex h-full w-full items-center justify-center text-xs font-medium">
         {initials || "??"}
       </AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>
@@ -174,7 +180,8 @@ function DropdownItem({
       className={cn(
         "flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none",
         "focus:bg-accent focus:text-accent-foreground",
-        variant === "destructive" && "text-destructive focus:bg-destructive/10 focus:text-destructive",
+        variant === "destructive" &&
+          "text-destructive focus:bg-destructive/10 focus:text-destructive",
       )}
     >
       {icon}

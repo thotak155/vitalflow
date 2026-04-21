@@ -89,13 +89,11 @@ export function DataTable<Row>({
   }
 
   if (state === "empty" || data.length === 0) {
-    return (
-      <EmptyState className={className} title={emptyTitle} description={emptyDescription} />
-    );
+    return <EmptyState className={className} title={emptyTitle} description={emptyDescription} />;
   }
 
   return (
-    <div className={cn("rounded-lg border border-border bg-background", className)}>
+    <div className={cn("border-border bg-background rounded-lg border", className)}>
       <Table>
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <TableHeader>

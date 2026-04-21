@@ -1,13 +1,5 @@
 import { createVitalFlowServerClient } from "@vitalflow/auth/server";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  FormField,
-  Input,
-} from "@vitalflow/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, FormField, Input } from "@vitalflow/ui";
 import { AlertCircle, HeartPulse } from "@vitalflow/ui/icons";
 import NextLink from "next/link";
 import { redirect } from "next/navigation";
@@ -18,7 +10,9 @@ interface ForgotPasswordSearchParams {
 
 async function requestReset(formData: FormData): Promise<void> {
   "use server";
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
 
   if (!email || !email.includes("@")) {
     redirect(`/forgot-password?error=${encodeURIComponent("Enter a valid email")}`);
@@ -46,12 +40,12 @@ export default async function ForgotPasswordPage({
   return (
     <Card className="shadow-vf-md">
       <CardHeader className="items-center text-center">
-        <div className="flex items-center gap-2 text-primary">
+        <div className="text-primary flex items-center gap-2">
           <HeartPulse className="h-6 w-6" aria-hidden />
           <span className="text-lg font-semibold tracking-tight">VitalFlow</span>
         </div>
         <CardTitle>Reset your password</CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           We&apos;ll email you a link to pick a new password.
         </p>
       </CardHeader>
@@ -59,9 +53,9 @@ export default async function ForgotPasswordPage({
         {error ? (
           <div
             role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground"
+            className="border-destructive/30 bg-destructive/5 text-foreground flex items-start gap-2 rounded-md border p-3 text-sm"
           >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+            <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>{error}</span>
           </div>
         ) : null}

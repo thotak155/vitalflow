@@ -1,13 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import type { AICompletionRequest, AIMessage, AIModel } from "@vitalflow/types";
+import type { AICompletionRequest, AIModel } from "@vitalflow/types";
 
-import type { AIProvider, CompletionChunk } from "./index.js";
+import type { AICompletionResult, AIProvider, CompletionChunk } from "./index.js";
 
 export class AnthropicProvider implements AIProvider {
   public readonly name = "anthropic" as const;
   public readonly supports: readonly AIModel[] = [
     "claude-opus-4-6",
+    "claude-opus-4-7",
     "claude-sonnet-4-6",
     "claude-haiku-4-5",
   ];
@@ -21,14 +22,13 @@ export class AnthropicProvider implements AIProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async complete(
-    request: AICompletionRequest,
-  ): Promise<{ content: string; messages: AIMessage[] }> {
+  async complete(request: AICompletionRequest): Promise<AICompletionResult> {
     const system = request.messages.find((m) => m.role === "system")?.content;
     const turns = request.messages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
+    const startedAt = Date.now();
     const response = await this.client.messages.create({
       model: request.model,
       max_tokens: request.maxTokens ?? 1024,
@@ -36,12 +36,21 @@ export class AnthropicProvider implements AIProvider {
       system,
       messages: turns,
     });
+    const latencyMs = Date.now() - startedAt;
 
     const content = response.content
       .map((block) => (block.type === "text" ? block.text : ""))
       .join("");
 
-    return { content, messages: [...request.messages, { role: "assistant", content }] };
+    return {
+      content,
+      messages: [...request.messages, { role: "assistant", content }],
+      usage: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+      },
+      latencyMs,
+    };
   }
 
   async *stream(request: AICompletionRequest): AsyncIterable<CompletionChunk> {

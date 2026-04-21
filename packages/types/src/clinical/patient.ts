@@ -46,7 +46,11 @@ export type CoverageType = z.infer<typeof CoverageTypeSchema>;
 export const PatientSchema = z.object({
   id: PatientIdSchema,
   tenantId: TenantIdSchema,
-  mrn: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
+  mrn: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/),
   givenName: z.string().min(1).max(128),
   familyName: z.string().min(1).max(128),
   preferredName: z.string().max(128).nullable().optional(),
@@ -55,7 +59,11 @@ export const PatientSchema = z.object({
   genderIdentity: z.string().max(64).nullable().optional(),
   pronouns: z.string().max(32).nullable().optional(),
   preferredLanguage: z.string().max(16).nullable().optional(),
-  ssnLast4: z.string().regex(/^\d{4}$/).nullable().optional(),
+  ssnLast4: z
+    .string()
+    .regex(/^\d{4}$/)
+    .nullable()
+    .optional(),
   deceasedAt: z.string().datetime().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime(),
@@ -73,7 +81,10 @@ export const PatientCreateSchema = PatientSchema.pick({
   pronouns: true,
   preferredLanguage: true,
 }).extend({
-  mrn: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional(), // server auto-generates if blank
+  mrn: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/)
+    .optional(), // server auto-generates if blank
 });
 export type PatientCreate = z.infer<typeof PatientCreateSchema>;
 
