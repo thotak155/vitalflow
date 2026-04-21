@@ -9,6 +9,7 @@ export {
   AlertCircle,
   AlertTriangle,
   Bell,
+  Building2,
   Calendar,
   Check,
   CheckCircle2,

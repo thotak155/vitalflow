@@ -1,5 +1,6 @@
 import {
   AlertCircle,
+  Calendar,
   ClipboardList,
   CreditCard,
   FileText,
@@ -32,6 +33,13 @@ export const providerNav: readonly NavSection[] = [
         href: "/patients",
         icon: Users,
         requires: ["patient:read"],
+      },
+      {
+        id: "appointments",
+        label: "Appointments",
+        href: "/appointments",
+        icon: Calendar,
+        requires: ["schedule:read"],
       },
       {
         id: "encounters",
