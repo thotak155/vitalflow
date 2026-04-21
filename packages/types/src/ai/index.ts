@@ -2,12 +2,17 @@ import { z } from "zod";
 
 export const AIModelSchema = z.enum([
   "claude-opus-4-6",
+  "claude-opus-4-7",
   "claude-sonnet-4-6",
   "claude-haiku-4-5",
   "gpt-4o",
   "gpt-4o-mini",
+  "gemini-2.0-flash",
 ]);
 export type AIModel = z.infer<typeof AIModelSchema>;
+
+export const AIProviderSchema = z.enum(["anthropic", "openai", "google"]);
+export type AIProvider = z.infer<typeof AIProviderSchema>;
 
 export const AIMessageRoleSchema = z.enum(["system", "user", "assistant", "tool"]);
 
@@ -27,3 +32,7 @@ export const AICompletionRequestSchema = z.object({
   requestId: z.string().uuid(),
 });
 export type AICompletionRequest = z.infer<typeof AICompletionRequestSchema>;
+
+// ---------- Scribe --------------------------------------------------------
+
+export * from "./scribe.js";
