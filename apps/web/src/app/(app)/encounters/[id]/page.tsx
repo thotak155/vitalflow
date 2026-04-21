@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { createVitalFlowAdminClient } from "@vitalflow/auth/admin";
 import { logEventBestEffort } from "@vitalflow/auth/audit";
 import { requirePermission } from "@vitalflow/auth/rbac";
 import {
@@ -55,6 +56,52 @@ type DiagnosisRow = {
   rank: number;
   pointer: string | null;
   assigned_at: string;
+};
+
+type AllergyRow = {
+  id: string;
+  type: string;
+  substance: string;
+  reaction: string | null;
+  severity: string | null;
+  notes: string | null;
+  onset_date: string | null;
+  created_at: string;
+};
+
+type MedicationRow = {
+  id: string;
+  display_name: string;
+  dose: string | null;
+  route: string | null;
+  frequency: string | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+type DocumentRow = {
+  id: string;
+  label: string | null;
+  kind: string;
+  source: string;
+  mime_type: string;
+  size_bytes: number;
+  signed_by: string | null;
+  signed_at: string | null;
+  effective_date: string | null;
+  created_at: string;
+  uploaded_by: string | null;
+};
+
+type AuditEventRow = {
+  id: string;
+  occurred_at: string;
+  actor_id: string | null;
+  action: string;
+  event_type: string | null;
+  row_id: string | null;
+  details: Record<string, unknown> | null;
 };
 
 type NoteRow = {
@@ -432,6 +479,175 @@ async function removeDiagnosis(formData: FormData): Promise<void> {
   redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Diagnosis removed")}`);
 }
 
+async function addAllergy(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "patient:write");
+
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  const patientId = String(formData.get("patient_id") ?? "");
+  const type = String(formData.get("type") ?? "");
+  const substance = String(formData.get("substance") ?? "").trim();
+  const reaction = String(formData.get("reaction") ?? "").trim();
+  const severity = String(formData.get("severity") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!patientId || !type || !substance) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent("Type and substance are required")}`,
+    );
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    };
+  })
+    .from("allergies")
+    .insert({
+      tenant_id: session.tenantId,
+      patient_id: patientId,
+      type,
+      substance,
+      reaction: reaction || null,
+      severity: severity || null,
+      notes: notes || null,
+      recorded_by: session.userId,
+    });
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Allergy added")}`);
+}
+
+async function removeAllergy(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "patient:write");
+
+  const id = String(formData.get("id") ?? "");
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  if (!id || !encounterId) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Missing allergy id")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      update: (v: Record<string, unknown>) => {
+        eq: (c: string, v: string) => {
+          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .from("allergies")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Allergy removed")}`);
+}
+
+async function addMedication(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "clinical:write");
+
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  const patientId = String(formData.get("patient_id") ?? "");
+  const displayName = String(formData.get("display_name") ?? "").trim();
+  const dose = String(formData.get("dose") ?? "").trim();
+  const route = String(formData.get("route") ?? "").trim();
+  const frequency = String(formData.get("frequency") ?? "").trim();
+  const startDate = String(formData.get("start_date") ?? "").trim();
+  const endDate = String(formData.get("end_date") ?? "").trim();
+
+  if (!patientId || !displayName) {
+    redirect(
+      `/encounters/${encounterId}?error=${encodeURIComponent("Medication name is required")}`,
+    );
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    };
+  })
+    .from("medications")
+    .insert({
+      tenant_id: session.tenantId,
+      patient_id: patientId,
+      display_name: displayName,
+      dose: dose || null,
+      route: route || null,
+      frequency: frequency || null,
+      status: "active",
+      start_date: startDate || null,
+      end_date: endDate || null,
+      prescribing_provider_id: session.userId,
+    });
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(`/encounters/${encounterId}?ok=${encodeURIComponent("Medication added")}`);
+}
+
+async function setMedicationStatus(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) redirect("/login");
+  requirePermission(session, "clinical:write");
+
+  const id = String(formData.get("id") ?? "");
+  const encounterId = String(formData.get("encounter_id") ?? "");
+  const next = String(formData.get("status") ?? "").trim();
+  const validNext = ["active", "on_hold", "completed", "stopped"];
+  if (!id || !validNext.includes(next)) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent("Invalid status")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const payload: Record<string, unknown> = { status: next };
+  if (next === "completed" || next === "stopped") {
+    payload.end_date = new Date().toISOString().slice(0, 10);
+  }
+  const { error } = await (supabase as unknown as {
+    from: (t: string) => {
+      update: (v: Record<string, unknown>) => {
+        eq: (c: string, v: string) => {
+          eq: (c: string, v: string) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+  })
+    .from("medications")
+    .update(payload)
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (error) {
+    redirect(`/encounters/${encounterId}?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath(`/encounters/${encounterId}`);
+  redirect(
+    `/encounters/${encounterId}?ok=${encodeURIComponent(`Medication marked ${next.replace(/_/g, " ")}`)}`,
+  );
+}
+
 async function amendNote(formData: FormData): Promise<void> {
   "use server";
   const session = await getSession();
@@ -709,6 +925,85 @@ export default async function EncounterWorkspacePage({
     .order("rank", { ascending: true });
   const diagnoses = (diagnosesRaw ?? []) as unknown as DiagnosisRow[];
 
+  const { data: allergiesRaw } = await supabase
+    .from("allergies")
+    .select("id, type, substance, reaction, severity, notes, onset_date, created_at")
+    .eq("patient_id", encounter.patient_id)
+    .eq("tenant_id", session.tenantId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  const allergies = (allergiesRaw ?? []) as unknown as AllergyRow[];
+
+  const { data: medicationsRaw } = await supabase
+    .from("medications")
+    .select("id, display_name, dose, route, frequency, status, start_date, end_date")
+    .eq("patient_id", encounter.patient_id)
+    .eq("tenant_id", session.tenantId)
+    .is("deleted_at", null)
+    .order("status", { ascending: true })
+    .order("start_date", { ascending: false });
+  const medications = (medicationsRaw ?? []) as unknown as MedicationRow[];
+
+  const { data: documentsRaw } = await supabase
+    .from("attachments")
+    .select("id, label, kind, source, mime_type, size_bytes, signed_by, signed_at, effective_date, created_at, uploaded_by")
+    .eq("encounter_id", id)
+    .eq("tenant_id", session.tenantId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  const documents = (documentsRaw ?? []) as unknown as DocumentRow[];
+
+  // Note audit trail — gated on audit:read. Uses the service-role admin client
+  // because audit.audit_events has no authenticated-user SELECT policy in V1;
+  // the permission check above is the authoritative gate.
+  const canViewAudit = session.permissions.includes("audit:read");
+  let auditEvents: AuditEventRow[] = [];
+  if (canViewAudit) {
+    // Fetch all version row ids for this encounter to filter audit events.
+    const { data: noteIdsRaw } = await supabase
+      .from("encounter_notes")
+      .select("id")
+      .eq("encounter_id", id)
+      .eq("tenant_id", session.tenantId);
+    const noteIds = ((noteIdsRaw ?? []) as unknown as { id: string }[]).map((r) => r.id);
+
+    if (noteIds.length > 0) {
+      const admin = createVitalFlowAdminClient();
+      const { data: eventsRaw } = await (admin as unknown as {
+        schema: (s: string) => {
+          from: (t: string) => {
+            select: (cols: string) => {
+              eq: (c: string, v: string) => {
+                eq: (c: string, v: string) => {
+                  in: (c: string, v: readonly string[]) => {
+                    order: (
+                      c: string,
+                      opts: { ascending: boolean },
+                    ) => {
+                      limit: (n: number) => Promise<{
+                        data: AuditEventRow[] | null;
+                        error: { message: string } | null;
+                      }>;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+      })
+        .schema("audit")
+        .from("audit_events")
+        .select("id, occurred_at, actor_id, action, event_type, row_id, details")
+        .eq("tenant_id", session.tenantId)
+        .eq("table_name", "encounter_notes")
+        .in("row_id", noteIds)
+        .order("occurred_at", { ascending: false })
+        .limit(20);
+      auditEvents = eventsRaw ?? [];
+    }
+  }
+
   const displayName = encounter.patient
     ? `${encounter.patient.given_name} ${encounter.patient.family_name}`
     : "Encounter";
@@ -832,6 +1127,230 @@ export default async function EncounterWorkspacePage({
                 </div>
               </dl>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Allergies — patient-scoped, visible near the top for safety */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Allergies ({allergies.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allergies.length > 0 ? (
+              <ul className="mb-4 divide-y text-sm">
+                {allergies.map((a) => (
+                  <li key={a.id} className="flex items-start justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{a.substance}</span>
+                        <Badge variant="muted">{a.type}</Badge>
+                        {a.severity ? (
+                          <Badge
+                            variant={
+                              a.severity === "life_threatening" || a.severity === "severe"
+                                ? "destructive"
+                                : a.severity === "moderate"
+                                  ? "warning"
+                                  : "muted"
+                            }
+                          >
+                            {a.severity.replace(/_/g, " ")}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {a.reaction ? (
+                        <div className="text-xs text-muted-foreground">Reaction: {a.reaction}</div>
+                      ) : null}
+                      {a.notes ? (
+                        <div className="text-xs text-muted-foreground">{a.notes}</div>
+                      ) : null}
+                    </div>
+                    {canWrite && !encounterFinished ? (
+                      <form action={removeAllergy}>
+                        <input type="hidden" name="id" value={a.id} />
+                        <input type="hidden" name="encounter_id" value={encounter.id} />
+                        <Button type="submit" size="sm" variant="outline">
+                          Remove
+                        </Button>
+                      </form>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mb-4 text-sm text-muted-foreground">
+                No known allergies on file. Record any reactions the patient reports below.
+              </p>
+            )}
+
+            {canWrite && !encounterFinished ? (
+              <form
+                action={addAllergy}
+                className="space-y-3 rounded-md border border-dashed border-border p-4"
+              >
+                <input type="hidden" name="encounter_id" value={encounter.id} />
+                <input type="hidden" name="patient_id" value={encounter.patient_id} />
+                <div className="grid gap-3 md:grid-cols-4">
+                  <FormField label="Type" htmlFor="allergy-type" required>
+                    <select
+                      id="allergy-type"
+                      name="type"
+                      required
+                      defaultValue="medication"
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="medication">Medication</option>
+                      <option value="food">Food</option>
+                      <option value="environmental">Environmental</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Substance" htmlFor="substance" required>
+                    <Input id="substance" name="substance" required placeholder="Penicillin" />
+                  </FormField>
+                  <FormField label="Reaction" htmlFor="reaction">
+                    <Input id="reaction" name="reaction" placeholder="Hives, swelling…" />
+                  </FormField>
+                  <FormField label="Severity" htmlFor="severity">
+                    <select
+                      id="severity"
+                      name="severity"
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">—</option>
+                      <option value="mild">Mild</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="severe">Severe</option>
+                      <option value="life_threatening">Life-threatening</option>
+                    </select>
+                  </FormField>
+                </div>
+                <FormField label="Notes" htmlFor="allergy-notes">
+                  <Input id="allergy-notes" name="notes" placeholder="Optional" />
+                </FormField>
+                <Button type="submit">Add allergy</Button>
+              </form>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Medications — patient-scoped, visible near the top for safety */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Medications ({medications.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {medications.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Medication</TableHead>
+                    <TableHead>Dose</TableHead>
+                    <TableHead>Route / Freq</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {medications.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium">{m.display_name}</TableCell>
+                      <TableCell>{m.dose ?? "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        {[m.route, m.frequency].filter(Boolean).join(" · ") || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {m.start_date ?? "—"}
+                        {m.end_date ? ` → ${m.end_date}` : ""}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            m.status === "active"
+                              ? "success"
+                              : m.status === "on_hold"
+                                ? "warning"
+                                : "muted"
+                          }
+                        >
+                          {m.status.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {canWrite && !encounterFinished && m.status === "active" ? (
+                          <div className="flex justify-end gap-2">
+                            <form action={setMedicationStatus}>
+                              <input type="hidden" name="id" value={m.id} />
+                              <input type="hidden" name="encounter_id" value={encounter.id} />
+                              <input type="hidden" name="status" value="on_hold" />
+                              <Button type="submit" size="sm" variant="outline">
+                                Hold
+                              </Button>
+                            </form>
+                            <form action={setMedicationStatus}>
+                              <input type="hidden" name="id" value={m.id} />
+                              <input type="hidden" name="encounter_id" value={encounter.id} />
+                              <input type="hidden" name="status" value="stopped" />
+                              <Button type="submit" size="sm" variant="outline">
+                                Stop
+                              </Button>
+                            </form>
+                          </div>
+                        ) : canWrite && !encounterFinished && m.status === "on_hold" ? (
+                          <form action={setMedicationStatus}>
+                            <input type="hidden" name="id" value={m.id} />
+                            <input type="hidden" name="encounter_id" value={encounter.id} />
+                            <input type="hidden" name="status" value="active" />
+                            <Button type="submit" size="sm" variant="outline">
+                              Resume
+                            </Button>
+                          </form>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="mb-4 text-sm text-muted-foreground">No medications on file.</p>
+            )}
+
+            {canWrite && !encounterFinished ? (
+              <form
+                action={addMedication}
+                className="mt-4 space-y-3 rounded-md border border-dashed border-border p-4"
+              >
+                <input type="hidden" name="encounter_id" value={encounter.id} />
+                <input type="hidden" name="patient_id" value={encounter.patient_id} />
+                <div className="grid gap-3 md:grid-cols-3">
+                  <FormField label="Medication" htmlFor="med-name" required>
+                    <Input
+                      id="med-name"
+                      name="display_name"
+                      required
+                      placeholder="Metformin 500 mg tab"
+                    />
+                  </FormField>
+                  <FormField label="Dose" htmlFor="med-dose">
+                    <Input id="med-dose" name="dose" placeholder="500 mg" />
+                  </FormField>
+                  <FormField label="Route" htmlFor="med-route">
+                    <Input id="med-route" name="route" placeholder="PO" />
+                  </FormField>
+                  <FormField label="Frequency" htmlFor="med-freq">
+                    <Input id="med-freq" name="frequency" placeholder="BID with meals" />
+                  </FormField>
+                  <FormField label="Start date" htmlFor="med-start">
+                    <Input id="med-start" name="start_date" type="date" />
+                  </FormField>
+                  <FormField label="End date" htmlFor="med-end">
+                    <Input id="med-end" name="end_date" type="date" />
+                  </FormField>
+                </div>
+                <Button type="submit">Add medication</Button>
+              </form>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -1134,6 +1653,60 @@ export default async function EncounterWorkspacePage({
           </CardContent>
         </Card>
 
+        {/* Documents (read-only — upload UI ships with Storage bucket wiring) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Documents ({documents.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {documents.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name / Kind</TableHead>
+                    <TableHead>Mime</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Signed</TableHead>
+                    <TableHead>Uploaded</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {documents.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell>
+                        <div className="font-medium">{d.label ?? "(unnamed)"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          <Badge variant="muted">{d.kind.replace(/_/g, " ")}</Badge>{" "}
+                          <span className="text-xs">via {d.source}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{d.mime_type}</TableCell>
+                      <TableCell className="text-xs">
+                        {(d.size_bytes / 1024).toFixed(1)} KB
+                      </TableCell>
+                      <TableCell>
+                        {d.signed_at ? (
+                          <Badge variant="success">Signed</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(d.created_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No documents attached to this encounter. Upload UI ships in a later slice along with
+                the Supabase Storage bucket configuration.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Version history */}
         {history.length > 0 ? (
           <Card>
@@ -1164,6 +1737,55 @@ export default async function EncounterWorkspacePage({
                   </li>
                 ))}
               </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Note audit trail — visible only to roles with audit:read */}
+        {canViewAudit ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Note audit trail ({auditEvents.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {auditEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No audit events yet. Events accrue as notes are created, saved, signed, or amended.
+                </p>
+              ) : (
+                <ul className="divide-y text-sm">
+                  {auditEvents.map((ev) => (
+                    <li key={ev.id} className="py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {new Date(ev.occurred_at).toLocaleString()}
+                        </span>
+                        <Badge variant="muted">{ev.action}</Badge>
+                        {ev.event_type ? (
+                          <Badge variant="default">{ev.event_type}</Badge>
+                        ) : null}
+                      </div>
+                      {ev.row_id ? (
+                        <div className="font-mono text-xs text-muted-foreground">
+                          note {ev.row_id.slice(0, 8)}…
+                        </div>
+                      ) : null}
+                      {ev.details && Object.keys(ev.details).length > 0 ? (
+                        <div className="text-xs text-muted-foreground">
+                          {Object.entries(ev.details)
+                            .slice(0, 3)
+                            .map(([k, v]) => `${k}=${typeof v === "string" ? v.slice(0, 60) : JSON.stringify(v).slice(0, 60)}`)
+                            .join(", ")}
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 text-xs text-muted-foreground">
+                Showing up to 20 most recent events for notes in this encounter. Full audit viewer at{" "}
+                <code>/admin/security</code> ships in a later slice.
+              </p>
             </CardContent>
           </Card>
         ) : null}
