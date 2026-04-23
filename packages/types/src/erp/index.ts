@@ -1,40 +1,9 @@
-import { z } from "zod";
+// ERP domain barrel. Keep this file ONLY as re-exports — never define a const
+// here. Peer modules (e.g. payment.ts) import sibling schemas by their direct
+// module path (`./invoice.js`) to avoid webpack-prod TDZ cycles through the
+// barrel. See the InvoiceIdSchema cycle fix commit for context.
 
-import { TenantIdSchema } from "../tenancy/index.js";
-
-export const InvoiceIdSchema = z.string().uuid().brand<"InvoiceId">();
-export type InvoiceId = z.infer<typeof InvoiceIdSchema>;
-
-export const MoneySchema = z.object({
-  amountMinor: z.number().int(),
-  currency: z.string().length(3),
-});
-export type Money = z.infer<typeof MoneySchema>;
-
-export const InvoiceStatusSchema = z.enum([
-  "draft",
-  "issued",
-  "paid",
-  "partial",
-  "void",
-  "written_off",
-]);
-
-export const InvoiceSchema = z.object({
-  id: InvoiceIdSchema,
-  tenantId: TenantIdSchema,
-  number: z.string(),
-  status: InvoiceStatusSchema,
-  total: MoneySchema,
-  balance: MoneySchema,
-  issuedAt: z.string().datetime().optional(),
-  dueAt: z.string().datetime().optional(),
-});
-export type Invoice = z.infer<typeof InvoiceSchema>;
-
-// ---------- V1 Billing / RCM domain -----------------------------------------
-// See docs/billing-rcm.md for the full design.
-
+export * from "./invoice.js";
 export * from "./charge.js";
 export * from "./claim.js";
 export * from "./denial.js";

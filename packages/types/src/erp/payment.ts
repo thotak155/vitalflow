@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { PatientIdSchema } from "../clinical/index.js";
 import { TenantIdSchema } from "../tenancy/index.js";
-import { InvoiceIdSchema } from "./index.js";
+import { InvoiceIdSchema } from "./invoice.js";
 import { PayerIdSchema } from "./claim.js";
 
 // ---------- IDs --------------------------------------------------------------
