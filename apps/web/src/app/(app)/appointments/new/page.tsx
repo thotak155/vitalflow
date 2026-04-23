@@ -21,6 +21,11 @@ import { PageHeader } from "@vitalflow/ui/patterns";
 import NextLink from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  findConflicts,
+  NON_BUSY_STATUSES,
+  type BusyWindow,
+} from "../../../../lib/appointments/busy-time.js";
 import { getSession } from "../../../../lib/session.js";
 
 export const dynamic = "force-dynamic";
@@ -106,7 +111,67 @@ async function createAppointment(formData: FormData): Promise<void> {
   }
   const endAt = new Date(startAt.getTime() + Math.max(5, durationMinutes) * 60 * 1000);
 
-  const { data, error } = await apptsTable(supabase)
+  // UC-B5 — server-side pre-check for slot conflicts. Query the whole day's
+  // appointments for the provider OR the location (if one is selected), then
+  // use the pure helper to categorize same-provider conflicts (hard block)
+  // and same-location / different-provider conflicts (soft warning).
+  const dayStart = new Date(startAt);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  type BusyRowDb = {
+    id: string;
+    start_at: string;
+    end_at: string;
+    provider_id: string;
+    location_id: string | null;
+    status: string;
+    provider: { full_name: string | null; email: string } | null;
+  };
+  let busyQ = supabase
+    .from("appointments")
+    .select(
+      "id, start_at, end_at, provider_id, location_id, status, " +
+        "provider:profiles!appointments_provider_profile_fkey(full_name, email)",
+    )
+    .eq("tenant_id", session.tenantId)
+    .gte("start_at", dayStart.toISOString())
+    .lt("start_at", dayEnd.toISOString())
+    .not("status", "in", `(${NON_BUSY_STATUSES.join(",")})`);
+  if (locationId) {
+    busyQ = busyQ.or(`provider_id.eq.${providerId},location_id.eq.${locationId}`);
+  } else {
+    busyQ = busyQ.eq("provider_id", providerId);
+  }
+  const { data: busyRaw } = await busyQ;
+  const busy: BusyWindow[] = ((busyRaw as BusyRowDb[] | null) ?? []).map((r) => ({
+    id: r.id,
+    start_at: r.start_at,
+    end_at: r.end_at,
+    provider_id: r.provider_id,
+    location_id: r.location_id,
+    status: r.status,
+    provider_name: r.provider?.full_name ?? r.provider?.email ?? null,
+  }));
+  const conflicts = findConflicts(busy, {
+    start_at: startAt.toISOString(),
+    end_at: endAt.toISOString(),
+    provider_id: providerId,
+    location_id: locationId || null,
+  });
+  const providerConflict = conflicts.find((c) => c.kind === "provider");
+  if (providerConflict) {
+    const who = providerConflict.provider_name ?? "this provider";
+    const from = new Date(providerConflict.start_at).toISOString().slice(11, 16);
+    const to = new Date(providerConflict.end_at).toISOString().slice(11, 16);
+    redirect(
+      `/appointments/new?error=${encodeURIComponent(
+        `This overlaps ${who}'s appointment from ${from} to ${to}.`,
+      )}&date=${encodeURIComponent(date)}`,
+    );
+  }
+
+  const insertResult = await apptsTable(supabase)
     .insert({
       tenant_id: session.tenantId,
       patient_id: patientId,
@@ -120,12 +185,20 @@ async function createAppointment(formData: FormData): Promise<void> {
     })
     .select("id")
     .single();
-  if (error || !data) {
+  if (insertResult.error || !insertResult.data) {
+    // Race path: another scheduler booked the same provider between our
+    // pre-check and insert. Postgres's `appointments_no_overlap` exclusion
+    // constraint rejects it with SQLSTATE 23P01. Surface a friendly message
+    // instead of the raw DB text.
+    const msg = insertResult.error?.message ?? "Failed to create appointment";
+    const friendly = msg.includes("appointments_no_overlap")
+      ? "Another appointment was just booked for this provider in the same window. Pick a different time."
+      : msg;
     redirect(
-      `/appointments/new?error=${encodeURIComponent(error?.message ?? "Failed to create appointment")}`,
+      `/appointments/new?error=${encodeURIComponent(friendly)}&date=${encodeURIComponent(date)}`,
     );
   }
-  redirect(`/appointments/${data.id}`);
+  redirect(`/appointments/${insertResult.data.id}`);
 }
 
 export default async function NewAppointmentPage({
