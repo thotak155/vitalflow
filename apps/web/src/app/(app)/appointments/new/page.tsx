@@ -1,20 +1,6 @@
 import { requirePermission } from "@vitalflow/auth/rbac";
 import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  FormField,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@vitalflow/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@vitalflow/ui";
 import { AlertCircle } from "@vitalflow/ui/icons";
 import { AppBreadcrumbs } from "@vitalflow/ui/layout";
 import { PageHeader } from "@vitalflow/ui/patterns";
@@ -27,6 +13,8 @@ import {
   type BusyWindow,
 } from "../../../../lib/appointments/busy-time.js";
 import { getSession } from "../../../../lib/session.js";
+
+import { BookingForm } from "./BookingForm.js";
 
 export const dynamic = "force-dynamic";
 
@@ -289,105 +277,23 @@ export default async function NewAppointmentPage({
           <CardTitle>Visit details</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createAppointment} className="space-y-4">
-            {presetPatient ? (
-              <div className="border-input bg-muted/30 rounded-md border p-3 text-sm">
-                <div className="text-muted-foreground text-xs uppercase">Patient</div>
-                <div className="font-medium">
-                  {presetPatient.given_name} {presetPatient.family_name}
-                </div>
-                <div className="text-muted-foreground font-mono text-xs">{presetPatient.mrn}</div>
-                <input type="hidden" name="patient_id" value={presetPatientId} />
-              </div>
-            ) : (
-              <FormField label="Patient MRN" htmlFor="patient_mrn" required>
-                <Input
-                  id="patient_mrn"
-                  name="patient_mrn"
-                  placeholder="MRN-XXXX"
-                  required
-                  autoComplete="off"
-                />
-              </FormField>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField label="Provider" htmlFor="provider_id" required>
-                <Select name="provider_id" defaultValue={session.userId}>
-                  <SelectTrigger id="provider_id">
-                    <SelectValue placeholder="Select a provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providers.map((p) => (
-                      <SelectItem key={p.user_id} value={p.user_id}>
-                        {p.full_name ?? p.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormField>
-              <FormField label="Location" htmlFor="location_id" helper="Optional.">
-                <Select name="location_id">
-                  <SelectTrigger id="location_id">
-                    <SelectValue
-                      placeholder={locations.length ? "Select a location" : "No locations"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormField>
-              <FormField label="Date" htmlFor="date" required>
-                <Input id="date" name="date" type="date" defaultValue={defaultDate} required />
-              </FormField>
-              <FormField label="Start time" htmlFor="start_time" required>
-                <Input id="start_time" name="start_time" type="time" required />
-              </FormField>
-              <FormField label="Duration (min)" htmlFor="duration_minutes">
-                <Input
-                  id="duration_minutes"
-                  name="duration_minutes"
-                  type="number"
-                  min={5}
-                  max={480}
-                  defaultValue={30}
-                />
-              </FormField>
-              <FormField label="Visit type" htmlFor="visit_type">
-                <Select name="visit_type" defaultValue="in_person">
-                  <SelectTrigger id="visit_type">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_person">In person</SelectItem>
-                    <SelectItem value="telehealth">Telehealth</SelectItem>
-                    <SelectItem value="phone">Phone</SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormField>
-            </div>
-
-            <FormField label="Reason for visit" htmlFor="reason">
-              <Textarea
-                id="reason"
-                name="reason"
-                rows={3}
-                placeholder="Chief complaint or follow-up…"
-              />
-            </FormField>
-
-            <div className="flex items-center gap-2">
-              <Button type="submit">Book appointment</Button>
-              <Button asChild variant="outline">
-                <NextLink href="/appointments">Cancel</NextLink>
-              </Button>
-            </div>
-          </form>
+          <BookingForm
+            createAppointment={createAppointment}
+            providers={providers}
+            locations={locations}
+            presetPatient={
+              presetPatient && presetPatientId
+                ? {
+                    id: presetPatientId,
+                    mrn: presetPatient.mrn,
+                    given_name: presetPatient.given_name,
+                    family_name: presetPatient.family_name,
+                  }
+                : null
+            }
+            defaultDate={defaultDate}
+            defaultProviderId={session.userId}
+          />
         </CardContent>
       </Card>
     </>
