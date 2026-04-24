@@ -1,4 +1,4 @@
-import { createVitalFlowAdminClient } from "@vitalflow/auth/admin";
+import { logEventBestEffort } from "@vitalflow/auth/audit";
 import { requirePermission } from "@vitalflow/auth/rbac";
 import { createVitalFlowServerClient, type SupabaseServerClient } from "@vitalflow/auth/server";
 import {
@@ -26,6 +26,7 @@ import NextLink from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import { generateToken, hashToken } from "../../../../lib/invitations/tokens.js";
 import { getSession } from "../../../../lib/session.js";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export const dynamic = "force-dynamic";
 interface MembersSearchParams {
   ok?: string;
   error?: string;
+  /** Raw invite token, surfaced once by inviteStaff() so the admin can copy the link. */
+  token?: string;
 }
 
 const ROLE_OPTIONS: readonly { value: StaffRole; label: string }[] = [
@@ -76,7 +79,22 @@ function membersTable(c: SupabaseServerClient): WritableMembersTable {
   return (c as unknown as { from: (t: string) => WritableMembersTable }).from("tenant_members");
 }
 
-async function createMember(formData: FormData): Promise<void> {
+type WritableInvitesTable = {
+  insert: (v: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+  update: (v: Record<string, unknown>) => {
+    eq: (
+      col: string,
+      val: string,
+    ) => {
+      eq: (col: string, val: string) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+};
+function invitesTable(c: SupabaseServerClient): WritableInvitesTable {
+  return (c as unknown as { from: (t: string) => WritableInvitesTable }).from("invitations");
+}
+
+async function inviteStaff(formData: FormData): Promise<void> {
   "use server";
   const session = await getSession();
   if (!session) {
@@ -87,53 +105,95 @@ async function createMember(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
   const roles = formData.getAll("roles").map(String).filter(Boolean) as StaffRole[];
 
-  if (!email.includes("@") || password.length < 12 || roles.length === 0) {
+  if (!email.includes("@") || roles.length === 0) {
     redirect(
       `/admin/members?error=${encodeURIComponent(
-        "Valid email, 12+ char password, and at least one role are required",
+        "Valid email and at least one role are required",
       )}`,
     );
   }
 
-  const admin = createVitalFlowAdminClient();
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName || email, user_kind: "staff" },
-  });
-  if (createErr || !created.user) {
+  // Block practice_owner grants unless the caller is already an owner — the DB
+  // `enforce_owner_grant` trigger will also catch this, but a friendly pre-check
+  // means a cleaner error message.
+  if (
+    roles.includes("practice_owner" as StaffRole) &&
+    !session.roles.includes("practice_owner" as StaffRole)
+  ) {
     redirect(
-      `/admin/members?error=${encodeURIComponent(
-        createErr?.message ?? "Failed to create auth user",
-      )}`,
+      `/admin/members?error=${encodeURIComponent("Only a practice owner can invite another owner")}`,
     );
   }
 
-  // Insert the tenant_members row as the acting admin (respects RLS +
-  // enforce_owner_grant trigger — they must be a practice_owner to grant
-  // practice_owner; office_admin can only grant non-owner roles).
+  const token = generateToken();
+  const token_hash = hashToken(token);
+
   const supabase = await createVitalFlowServerClient();
-  const { error: memberErr } = await membersTable(supabase).insert({
+  const { error } = await invitesTable(supabase).insert({
     tenant_id: session.tenantId,
-    user_id: created.user.id,
+    email,
     roles,
-    status: "active",
+    token_hash,
     invited_by: session.userId,
+    status: "pending",
   });
-  if (memberErr) {
-    // Best effort: delete the auth user we just created so the operation
-    // doesn't leave an orphan.
-    await admin.auth.admin.deleteUser(created.user.id);
-    redirect(`/admin/members?error=${encodeURIComponent(memberErr.message)}`);
+  if (error) {
+    const friendly = error.message.includes("invitations_tenant_id_email_status_key")
+      ? `There's already a pending invite for ${email}. Revoke it first to issue a new link.`
+      : error.message;
+    redirect(`/admin/members?error=${encodeURIComponent(friendly)}`);
   }
+
+  await logEventBestEffort({
+    tenantId: session.tenantId,
+    actorId: session.userId,
+    eventType: "member.invited",
+    details: { invitee_email_domain: email.split("@")[1] ?? null, roles },
+  });
 
   revalidatePath("/admin/members");
-  redirect(`/admin/members?ok=${encodeURIComponent(`Added ${email}`)}`);
+  redirect(
+    `/admin/members?ok=${encodeURIComponent(
+      `Invite created for ${email}. Copy the link below and send it out — it expires in 7 days.`,
+    )}&token=${encodeURIComponent(token)}`,
+  );
+}
+
+async function revokeInvite(formData: FormData): Promise<void> {
+  "use server";
+  const session = await getSession();
+  if (!session) {
+    redirect("/login?next=/admin/members");
+  }
+  requirePermission(session, "admin:users");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) {
+    redirect(`/admin/members?error=${encodeURIComponent("Missing invite id")}`);
+  }
+
+  const supabase = await createVitalFlowServerClient();
+  const { error } = await invitesTable(supabase)
+    .update({ status: "revoked" })
+    .eq("id", id)
+    .eq("tenant_id", session.tenantId);
+  if (error) {
+    redirect(`/admin/members?error=${encodeURIComponent(error.message)}`);
+  }
+
+  await logEventBestEffort({
+    tenantId: session.tenantId,
+    actorId: session.userId,
+    eventType: "member.invite_cancelled",
+    targetTable: "invitations",
+    targetRowId: id,
+    details: {},
+  });
+
+  revalidatePath("/admin/members");
+  redirect(`/admin/members?ok=${encodeURIComponent("Invite revoked")}`);
 }
 
 async function updateRoles(formData: FormData): Promise<void> {
@@ -217,6 +277,23 @@ export default async function MembersPage({
     .order("joined_at", { ascending: true });
   const members = (membersRaw ?? []) as unknown as MemberRow[];
 
+  type PendingInviteRow = {
+    id: string;
+    email: string;
+    roles: StaffRole[];
+    created_at: string;
+    expires_at: string;
+    invited_by: string;
+  };
+  const { data: invitesRaw } = await supabase
+    .from("invitations")
+    .select("id, email, roles, created_at, expires_at, invited_by")
+    .eq("tenant_id", session.tenantId)
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  const pendingInvites = (invitesRaw ?? []) as unknown as PendingInviteRow[];
+
   return (
     <>
       <AppBreadcrumbs
@@ -249,33 +326,22 @@ export default async function MembersPage({
       ) : null}
 
       <div className="grid gap-6">
+        {params.token ? <InviteLinkBanner token={params.token} /> : null}
+
         <Card>
           <CardHeader>
-            <CardTitle>Add a member</CardTitle>
+            <CardTitle>Invite staff by email</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={createMember} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="Email" htmlFor="email" required>
-                  <Input id="email" name="email" type="email" required autoComplete="off" />
-                </FormField>
-                <FormField label="Full name" htmlFor="full_name">
-                  <Input id="full_name" name="full_name" type="text" autoComplete="off" />
-                </FormField>
-              </div>
-              <FormField
-                label="Temporary password"
-                htmlFor="password"
-                required
-                helper="Share out-of-band. The user can change it after sign in."
-              >
+            <form action={inviteStaff} className="space-y-4">
+              <FormField label="Email" htmlFor="email" required>
                 <Input
-                  id="password"
-                  name="password"
-                  type="text"
-                  minLength={12}
+                  id="email"
+                  name="email"
+                  type="email"
                   required
                   autoComplete="off"
+                  placeholder="newstaff@demo.clinic"
                 />
               </FormField>
               <fieldset>
@@ -292,8 +358,68 @@ export default async function MembersPage({
                   ))}
                 </div>
               </fieldset>
-              <Button type="submit">Create member</Button>
+              <div className="flex items-start gap-3">
+                <Button type="submit">Create invite</Button>
+                <p className="text-muted-foreground text-xs leading-tight">
+                  An invite link is generated with a 7-day expiry. Copy it and send by any channel
+                  (email dispatch ships next sprint). The recipient sets their own password on first
+                  sign-in.
+                </p>
+              </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending invitations ({pendingInvites.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pendingInvites.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No open invites.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Roles</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingInvites.map((inv) => (
+                    <TableRow key={inv.id}>
+                      <TableCell className="font-medium">{inv.email}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {inv.roles.map((r) => (
+                            <Badge key={r} variant="muted">
+                              {r.replace(/_/g, " ")}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(inv.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(inv.expires_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <form action={revokeInvite}>
+                          <input type="hidden" name="id" value={inv.id} />
+                          <Button type="submit" size="sm" variant="outline">
+                            Revoke
+                          </Button>
+                        </form>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -390,5 +516,28 @@ export default async function MembersPage({
         </Card>
       </div>
     </>
+  );
+}
+
+/**
+ * Shown ONCE after a successful inviteStaff action — the raw token is in the
+ * URL query string, never persisted. Admin copies the link and sends it.
+ */
+function InviteLinkBanner({ token }: { token: string }) {
+  const link = `/invitations/accept?token=${token}`;
+  return (
+    <div
+      role="status"
+      className="border-primary/30 bg-primary/5 space-y-2 rounded-md border p-3 text-sm"
+    >
+      <p className="font-medium">Copy this invite link:</p>
+      <code className="bg-background block break-all rounded border border-slate-200 p-2 font-mono text-xs">
+        {link}
+      </code>
+      <p className="text-muted-foreground text-xs">
+        This link is shown once. Paste it into an email, Slack, or SMS to the new staff member.
+        Anyone with the link can accept — treat it like a password.
+      </p>
+    </div>
   );
 }
